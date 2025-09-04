@@ -1,0 +1,136 @@
+# Black‑Box E2E Test Requirements
+
+This document defines end‑to‑end (E2E) black‑box API test cases for the current HTTP surface of `modeld`.
+
+The goal is to validate observable behavior by starting the real server process (or an equivalent `httptest` server) and exercising its public endpoints purely over HTTP.
+
+## Scope
+
+- Server entrypoint: `cmd/modeld/main.go`.
+- Router and handlers: `internal/httpapi/server.go`.
+- Manager behavior (as observable via API): `internal/manager/*`.
+- Types and payloads: `pkg/types/*`.
+
+## Test Environment Setup
+
+- Create a temporary models directory populated with one or more empty `*.gguf` files (the registry loader only checks file name suffix for discovery).
+- Start the server with:
+  - `--addr` or `MODELD_ADDR` set to a known free port.
+  - `--models-dir` pointing to the temp directory.
+  - Optional: `--default-model` set to an existing file name (e.g., `alpha.gguf`).
+  - Optional: `--vram-budget-mb` and `--vram-margin-mb` for budgeting paths.
+- Define a simple readiness wait strategy:
+  - `GET /healthz` should be `200` as soon as the process is up.
+  - `GET /readyz` becomes `200` after at least one model instance reaches `Ready` state (typically triggered by performing an `/infer`).
+
+Note: For in‑process tests, `httptest.NewServer(httpapi.NewMux(manager.New(...)))` is acceptable and already used in `internal/e2e/e2e_test.go`.
+
+## Endpoints and Test Cases
+
+### 1) GET /healthz (Liveness)
+
+- [HAPPY] Returns `200 OK` with body containing `ok` once the HTTP server is accepting connections.
+  - Precondition: server started.
+  - Assert: `status=200`, `body` contains `ok`.
+
+### 2) GET /readyz (Readiness)
+
+- [INIT] Returns `503 Service Unavailable` with body containing `loading` if no model instance is yet ready.
+  - Precondition: server started; no inference performed; default model may not be warmed.
+  - Assert: `status=503`, `body` contains `loading`.
+
+- [READY] Returns `200 OK` with body containing `ready` after at least one instance is warmed.
+  - Action: POST `/infer` (see below) using an existing model or default model to trigger warmup.
+  - Poll `/readyz` until `200`, within timeout.
+  - Assert: `status=200`, `body` contains `ready`.
+
+### 3) GET /models (Registry)
+
+- [HAPPY] Returns `200 OK` and JSON list of discovered models.
+  - Precondition: temp models dir contains N `*.gguf` files.
+  - Assert: `status=200`, `Content-Type` includes `application/json`.
+  - Assert: response JSON has key `models` with length N. Elements conform to `pkg/types.Model` shape.
+
+- [EMPTY] Returns `200 OK` with empty list when directory has zero `*.gguf` files.
+  - Precondition: empty directory.
+  - Assert: `models` length is 0.
+
+### 4) GET /status (Manager snapshot)
+
+- [HAPPY] Returns `200 OK` and JSON body conforming to `pkg/types.StatusResponse`.
+  - Assert: `status=200`, JSON decodes to `StatusResponse`.
+  - If no inference yet: `Instances` may be empty; numeric fields present.
+
+- [AFTER_INFER] After performing an `/infer`, returns at least one instance with plausible fields.
+  - Action: POST `/infer` to warm an instance.
+  - Assert: `Instances` length >= 1.
+  - Optional: fields like `BudgetMB`, `UsedMB`, `MarginMB` are integers; `InstanceStatus` fields present.
+
+### 5) POST /infer (Streaming NDJSON)
+
+- [HAPPY_DEFAULT_MODEL] With payload omitting `model` and `--default-model` configured, returns `200 OK` and streams NDJSON.
+  - Request JSON: `{ "prompt": "hello" }` (and optionally `"stream": true`).
+  - Assert: `status=200`, `Content-Type` includes `application/x-ndjson`.
+  - Assert: response body contains multiple newline‑delimited JSON objects (at least two lines; last contains a terminal marker like `{ "done": true }` in current stub).
+
+- [HAPPY_EXPLICIT_MODEL] With `model` set to an existing id (e.g., `alpha.gguf`), returns `200 OK` streaming NDJSON.
+  - Request JSON: `{ "model": "alpha.gguf", "prompt": "hi" }`.
+  - Assert as above.
+
+- [BAD_JSON] With invalid JSON body, returns `400 Bad Request` and error text.
+  - Request body: `not-json`.
+  - Assert: `status=400`.
+
+- [MODEL_NOT_FOUND] With `model` set to a non‑existent id, returns `404 Not Found`.
+  - Request JSON: `{ "model": "does-not-exist.gguf", "prompt": "hi" }`.
+  - Assert: `status=404`.
+
+- [NO_DEFAULT_AND_NO_MODEL] If no `--default-model` is provided and request omits `model`, returns `404 Not Found`.
+  - Server started without `--default-model`.
+  - Request JSON: `{ "prompt": "hi" }`.
+  - Assert: `status=404`.
+
+- [TOO_BUSY_429] Under configured backpressure conditions, returns `429 Too Many Requests`.
+  - Precondition: configure manager to a tiny per‑instance queue (see `ManagerConfig` via constructor, or run two concurrent `/infer` requests to the same model when only one in‑flight is allowed). In current implementation, backpressure mapping is exposed when `tooBusyError` is returned inside `manager`.
+  - Action: start one long‑running `/infer` (e.g., hold the connection or simulate delay), then immediately send another `/infer` for the same model.
+  - Assert: second request receives `status=429`.
+
+- [CLIENT_CANCELLED] If the client cancels the request context mid‑stream, server should stop without producing a 500.
+  - Action: open `/infer` and abort the HTTP request; ensure the server does not respond with 500 (hard to assert externally; can be approximated by ensuring no error logs or by observing connection close behavior).
+
+## Process‑Level E2E Flow (Black‑Box)
+
+1) Build binary: `go build -o bin/modeld ./cmd/modeld`.
+2) Create temp models dir and touch `alpha.gguf`, `beta.gguf`.
+3) Start process (child) with:
+   - `--addr :18080`
+   - `--models-dir <tempdir>`
+   - `--default-model alpha.gguf`
+4) Wait for `GET /healthz` to be `200`.
+5) Verify `GET /models` returns 2 models.
+6) Verify initial `GET /readyz` is `503`.
+7) Call `POST /infer` without `model`; expect `200` and streaming NDJSON.
+8) Poll `GET /readyz` until `200` (or timeout).
+9) Verify `GET /status` shows at least one instance.
+10) Negative cases:
+    - `POST /infer` with `model=missing.gguf` → `404`.
+    - Start server without `--default-model`, `POST /infer` with no `model` → `404`.
+    - Backpressure scenario to elicit `429` (advanced; see note above).
+11) Stop process and cleanup temp files.
+
+## Notes and Current Behaviors (as of codebase)
+
+- `internal/httpapi/server.go` maps errors:
+  - Invalid JSON → `400`.
+  - `HTTPError` implementations determine status (manager uses specific error types).
+  - Otherwise → `500`.
+- `internal/manager/infer.go` currently emits small NDJSON token chunks with newlines and a terminal `{ "done": true }` entry.
+- `internal/registry.GGUFScanner` discovers models by `*.gguf` suffix; files need not be non‑empty for discovery.
+
+## Future Extensions
+
+- Contract tests against an OpenAPI spec (once available) to validate schema.
+- SSE/WebSocket event tests (when implemented).
+- Metrics/tracing observability checks.
+- Auth/RBAC tests (once added).
+- Performance and soak tests (k6) separate from functional E2E.
