@@ -11,6 +11,12 @@ The goal is to validate observable behavior by starting the real server process 
 - Manager behavior (as observable via API): `internal/manager/*`.
 - Types and payloads: `pkg/types/*`.
 
+## How to Run
+
+- Locally: `make e2e-py`
+  - Uses a virtualenv in `.venv`, installs `tests/e2e_py/requirements.txt`, and runs `pytest tests/e2e_py`.
+- CI: GitHub Actions runs the suite on Python 3.10, 3.11, and 3.12 and uploads artifacts on failure.
+
 ## Test Environment Setup
 
 - Create a temporary models directory populated with one or more empty `*.gguf` files (the registry loader only checks file name suffix for discovery).
@@ -23,7 +29,9 @@ The goal is to validate observable behavior by starting the real server process 
   - `GET /healthz` should be `200` as soon as the process is up.
   - `GET /readyz` becomes `200` after at least one model instance reaches `Ready` state (typically triggered by performing an `/infer`).
 
-Note: For in‑process tests, `httptest.NewServer(httpapi.NewMux(manager.New(...)))` is acceptable and already used in `internal/e2e/e2e_test.go`.
+Notes:
+- For in‑process Go tests, `httptest.NewServer(httpapi.NewMux(manager.New(...)))` is already used in `internal/e2e/e2e_test.go`.
+- Python black‑box helpers live in `tests/e2e_py/helpers.py` and provide `start_server`, `start_server_with_handle`, and `start_server_with_config` for YAML/JSON/TOML.
 
 ## Endpoints and Test Cases
 

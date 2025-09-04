@@ -253,7 +253,37 @@ Adjust paths to match your environment and ensure your config file and models di
 ## Development
 
 - `scripts/dev-run.sh` runs the server with an example `--config` path. Create that config file or change the script to pass your flags.
-- Black-box tests include a client-cancellation scenario: see `tests/e2e_py/test_blackbox.py::test_blackbox_client_cancellation_mid_stream`.
+
+## Testing
+
+There are two primary test suites:
+
+- Go unit and in-process E2E tests
+  - Command: `make test`
+  - Location: `internal/**` (e.g., `internal/httpapi`, `internal/manager`, `internal/e2e`)
+  - Notes: E2E tests construct an `httptest.Server` using the mux and manager. Shared helpers live in `internal/e2e/helpers_test.go`.
+
+- Python black-box tests
+  - Command: `make e2e-py`
+  - Location: `tests/e2e_py/`
+  - Helpers: `tests/e2e_py/helpers.py` provides `start_server`, `start_server_with_handle`, `start_server_with_config`, and utilities.
+  - Notes: Tests build the binary (`CGO_ENABLED=0`) and start a subprocess on a free port, exercising the HTTP API over real sockets.
+
+Common endpoints exercised include `/healthz`, `/readyz`, `/models`, `/status`, and streaming `POST /infer` (NDJSON). Negative-path tests cover 404 and backpressure (429) scenarios.
+
+## Continuous Integration (CI)
+
+GitHub Actions runs on pushes and pull requests:
+
+- Go job
+  - Runs `go test ./...` with coverage and enforces a minimum of 80%.
+  - Uploads `coverage.out` and sends coverage to Codecov if `CODECOV_TOKEN` is configured.
+
+- Python E2E job
+  - Matrix across Python 3.10, 3.11, 3.12.
+  - Caches pip based on `tests/e2e_py/requirements.txt` and Python version.
+  - Runs `pytest tests/e2e_py` and uploads JUnit XML and console logs on failure.
+
 - Unit tests for the manager live in `internal/manager/manager_test.go`.
 
 ## Roadmap / Non-Goals (initial)
