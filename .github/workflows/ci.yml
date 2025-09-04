@@ -18,6 +18,9 @@ jobs:
   test:
     name: Test (Go)
     runs-on: ubuntu-latest
+    env:
+      SWAG_VERSION: v1.16.6
+      GOLANGCI_LINT_VERSION: v1.56.2
 
     steps:
       - name: Checkout
@@ -74,7 +77,7 @@ jobs:
       - name: Generate Swagger docs
         run: |
           set -euo pipefail
-          go run github.com/swaggo/swag/cmd/swag@latest init -g cmd/modeld/main.go -o docs
+          go run github.com/swaggo/swag/cmd/swag@${SWAG_VERSION} init -g cmd/modeld/main.go -o docs
 
       - name: Validate Swagger artifacts exist
         run: |
@@ -102,6 +105,16 @@ jobs:
         run: |
           set -euo pipefail
           go build -tags=swagger ./...
+
+      - name: Install golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
+
+      - name: Run golangci-lint
+        run: |
+          set -euo pipefail
+          golangci-lint run
 
       - name: Run tests with coverage
         run: |

@@ -41,15 +41,19 @@ e2e-py:
 	@python3 -m venv .venv
 	@source .venv/bin/activate && pip install -r tests/e2e_py/requirements.txt && pytest -q tests/e2e_py
 
+# Tooling versions (can be overridden via environment)
+SWAG_VERSION ?= v1.16.6
+GOLANGCI_LINT_VERSION ?= v1.56.2
+
 # Swagger / OpenAPI helpers
 swagger-install:
-	@go install github.com/swaggo/swag/cmd/swag@latest
+	@go install github.com/swaggo/swag/cmd/swag@$(SWAG_VERSION)
 
 swagger-gen:
 	@if command -v swag >/dev/null 2>&1; then \
 		swag init -g cmd/modeld/main.go -o docs ; \
 	else \
-		go run github.com/swaggo/swag/cmd/swag@latest init -g cmd/modeld/main.go -o docs ; \
+		go run github.com/swaggo/swag/cmd/swag@$(SWAG_VERSION) init -g cmd/modeld/main.go -o docs ; \
 	fi
 
 swagger-build:
@@ -58,3 +62,11 @@ swagger-build:
 
 swagger-run:
 	@go run -tags=swagger ./cmd/modeld
+
+# Linting
+install-golangci-lint:
+	@go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
+
+lint:
+	@command -v golangci-lint >/dev/null 2>&1 || { echo "golangci-lint not found; run 'make install-golangci-lint'" >&2; exit 1; }
+	@golangci-lint run
