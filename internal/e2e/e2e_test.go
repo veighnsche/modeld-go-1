@@ -139,3 +139,29 @@ func TestE2E_Models_Infer_Ready_Status(t *testing.T) {
     if err := json.Unmarshal(body, &st); err != nil { t.Fatalf("/status json: %v body=%s", err, string(body)) }
     if len(st.Instances) < 1 { t.Fatalf("/status expected instances >=1, got %d", len(st.Instances)) }
 }
+
+// TestE2E_Metrics_Endpoint ensures Prometheus metrics endpoint is exposed
+// and returns standard modeld http metrics after at least one request.
+func TestE2E_Metrics_Endpoint(t *testing.T) {
+    dir, models := createTempModelsDir(t, "alpha.gguf")
+    srv, _ := newServerForDir(t, dir, 0, 0, models[0])
+
+    // Trigger at least one request so counters are non-zero
+    r, body := httpPostJSON(t, srv.URL+"/infer", []byte(`{"prompt":"hello"}`))
+    if r.StatusCode != http.StatusOK {
+        t.Fatalf("/infer status=%d body=%s", r.StatusCode, string(body))
+    }
+
+    // Fetch /metrics
+    resp, mbody := httpGet(t, srv.URL+"/metrics")
+    if resp.StatusCode != http.StatusOK {
+        t.Fatalf("/metrics status=%d body=%s", resp.StatusCode, string(mbody))
+    }
+    // Look for a known metric name
+    if !bytes.Contains(mbody, []byte("modeld_http_requests_total")) {
+        t.Fatalf("/metrics missing expected counter; got: %q", string(mbody[:min(200, len(mbody))]))
+    }
+}
+
+// min helper for small debug slices
+func min(a, b int) int { if a < b { return a }; return b }

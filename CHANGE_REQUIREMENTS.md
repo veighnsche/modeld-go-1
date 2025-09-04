@@ -8,38 +8,23 @@ Each item includes rationale, scope, target files, and acceptance criteria. Use 
 
 ## 1) Observability and Logging
 
-- Structured logging and correlation
-  - Rationale: Current logs use `log.Printf` and are unstructured; harder to query and correlate. `middleware.RequestID` exists but is not embedded in logs.
-  - Scope:
-    - Introduce a structured logger (e.g., `uber-go/zap` or `rs/zerolog`).
-    - Include request id, path, model id, status code, and latency in logs.
-    - Redact or truncate prompt content to avoid PII leakage.
-  - Targets:
-    - `internal/httpapi/server.go` (replace `log.Printf` usage)
-    - Optionally `cmd/modeld/main.go` (logger setup and wiring)
-  - Acceptance:
-    - Logs are JSON and include `request_id` on `/infer`, `/status`, `/models`.
-    - No full prompts appear in logs unless explicitly `debug`.
-
 - Request-level logging controls
   - Rationale: Per-request overrides exist (`X-Log-Level`, `?log=`) but not documented/configurable broadly.
-  - Scope: Expose default log level via flag and config, document overrides.
-  - Targets: `internal/httpapi/server.go`, `cmd/modeld/main.go`, `README.md`
-  - Acceptance: `--log-level` flag and config key; README documents header/query overrides.
+  - Scope: Document header/query overrides and the default log level flag/config already present.
+  - Targets: `README.md`
+  - Acceptance: README documents header (`X-Log-Level`) and query (`?log=`) overrides.
 
 ## 2) Metrics (Prometheus)
 
-- Add `/metrics` endpoint
-  - Rationale: No current metrics; need visibility into traffic, latency, backpressure, VRAM budgeting.
-  - Scope:
-    - Integrate `prometheus/client_golang` and expose `promhttp.Handler()` at `/metrics`.
-    - Export counters, histograms, and gauges:
-      - HTTP request total / duration by `path`, `method`, `status`.
-      - In-flight requests per path.
-      - Backpressure rejections (429) and reasons.
-      - Manager gauges: `budget_mb`, `used_est_mb`, `margin_mb`, per-instance `queue_len`, `inflight`.
-  - Targets: `internal/httpapi/server.go` (middleware + route), `internal/manager/status.go` (metrics update points), `go.mod`.
-  - Acceptance: `curl /metrics` returns registries and updates during e2e runs.
+Done: `/metrics` endpoint is implemented via `promhttp` in `internal/httpapi/server.go`, with middleware in `internal/httpapi/metrics.go`.
+
+Exposed metrics (namespace `modeld`, subsystem `http`):
+- `modeld_http_requests_total{path,method,status}` (counter)
+- `modeld_http_request_duration_seconds{path,method,status}` (histogram)
+- `modeld_http_inflight_requests{path}` (gauge)
+- `modeld_http_backpressure_total{reason}` (counter)
+
+Note: Path labels currently use the request path; consider mapping to stable route names to reduce cardinality.
 
 ## 3) API Hardening and Versioning
 
@@ -60,18 +45,8 @@ Deferred for now to keep scope focused and velocity high.
   - Acceptance: Tests assert terminal done line presence.
 
 ## 5) Backpressure and Timeouts
-
-- Expose backpressure knobs via flags/config
-  - Rationale: `ManagerConfig{ MaxQueueDepth, MaxWait }` is used in tests but not exposed to runtime config.
-  - Scope: Add config keys and flags; document behavior and defaults.
-  - Targets: `cmd/modeld/main.go`, `internal/config/loader.go`, `README.md`.
-  - Acceptance: Values applied at startup and affect 429 behavior deterministically.
-
-- Handler/request timeouts
-  - Rationale: Prevent indefinite streams.
-  - Scope: Add `middleware.Timeout` or explicit context timeouts for `/infer` based on configurable `--infer-timeout`.
-  - Targets: `internal/httpapi/server.go`, `cmd/modeld/main.go`.
-  - Acceptance: Long-running requests are canceled with appropriate 504/499 mapping.
+ 
+Done: Backpressure knobs (`--max-queue-depth`, `--max-wait`) and `/infer` timeout (`--infer-timeout`) are implemented and wired through config/flags.
 
 ## 6) Security (Opt-in)
 
@@ -93,11 +68,7 @@ Deferred; consider in a future phase if deployment context requires it.
 
 ## 8) Middlewares and Headers
 
-- CORS
-  - Rationale: Browser clients support.
-  - Scope: Add configurable CORS (origins, methods, headers) and defaults.
-  - Targets: `internal/httpapi/server.go`, `cmd/modeld/main.go`.
-  - Acceptance: Preflight succeeds under configured origins.
+Done: Configurable CORS is implemented (flags and config; preflight behavior covered by tests).
 
 
 ## 9) CI/CD and Tooling
@@ -152,13 +123,11 @@ Deferred; current defaults avoid logging full prompts unless request-level debug
 
 ## Proposed PR Sequence
 
-1. Observability baseline
-   - Structured logging, `/metrics`, keep body size and compression.
-2. Reliability and config
-   - Backpressure flags/config, request timeouts, optional prewarm.
-3. Request model improvements
+1. Reliability and readiness
+   - Optional prewarm default model.
+2. Request model improvements
    - Enrich `InferRequest` and add validation.
-4. CI/CD and DX
+3. CI/CD and DX
    - Race tests, linting, Dockerfile, example configs.
 
 ---

@@ -1,3 +1,12 @@
+### 6) GET /metrics (Prometheus)
+
+- [INFO] Exposes Prometheus metrics via `promhttp` at `/metrics`.
+  - Key metrics (namespace `modeld`, subsystem `http`):
+    - `modeld_http_requests_total{path,method,status}`
+    - `modeld_http_request_duration_seconds{path,method,status}`
+    - `modeld_http_inflight_requests{path}`
+    - `modeld_http_backpressure_total{reason}`
+  - Note: This endpoint returns Prometheus text exposition format and is primarily consumed by Prometheus. Black-box tests typically do not assert the content unless explicitly needed.
 # Black‑Box E2E Test Requirements
 
 This document defines end‑to‑end (E2E) black‑box API test cases for the current HTTP surface of `modeld`.

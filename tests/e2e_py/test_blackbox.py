@@ -75,6 +75,20 @@ def test_blackbox_flow():
         assert len(st["instances"]) >= 1
 
 
+def test_metrics_endpoint_basic():
+    """Ensure /metrics endpoint is exposed and returns Prometheus metrics."""
+    models_dir, models = touch_models(["alpha.gguf"]) 
+    with start_server(models_dir, default_model=models[0]) as base:
+        # Trigger one request to increment counters
+        r = requests.post(base + "/infer", json={"prompt": "hello"})
+        assert r.status_code == 200
+        # Fetch /metrics
+        m = requests.get(base + "/metrics")
+        assert m.status_code == 200
+        text = m.text
+        assert "modeld_http_requests_total" in text
+
+
 def _run_min_flow(base: str, models: list[str]):
     r = requests.get(base + "/healthz"); assert r.status_code == 200
     r = requests.get(base + "/models"); assert r.status_code == 200

@@ -284,6 +284,24 @@ GitHub Actions runs on pushes and pull requests:
   - Caches pip based on `tests/e2e_py/requirements.txt` and Python version.
   - Runs `pytest tests/e2e_py` and uploads JUnit XML and console logs on failure.
 
+## Metrics
+
+The server exposes Prometheus metrics at `GET /metrics`.
+
+Current metrics (namespace `modeld`, subsystem `http`):
+
+- `modeld_http_requests_total` (counter)
+  - Labels: `path`, `method`, `status`
+- `modeld_http_request_duration_seconds` (histogram)
+  - Labels: `path`, `method`, `status`
+- `modeld_http_inflight_requests` (gauge)
+  - Labels: `path`
+- `modeld_http_backpressure_total` (counter)
+  - Labels: `reason` (e.g., `queue_full`, `wait_timeout`)
+
+Notes:
+- The middleware instruments all HTTP handlers. Path labels currently use the request path string. Consider mapping to stable route names to reduce cardinality in high-variance environments.
+
 - Unit tests for the manager live in `internal/manager/manager_test.go`.
 
 ## Roadmap / Non-Goals (initial)
