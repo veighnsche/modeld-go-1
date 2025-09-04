@@ -3,7 +3,6 @@ package httpapi
 import (
 	"encoding/json"
 	"net/http"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 	"modeld/internal/manager"
@@ -17,20 +16,15 @@ func NewMux(mgr *manager.Manager) http.Handler {
 	r.Get("/models", func(w http.ResponseWriter, r *http.Request) {
 		// TODO: read from config/registry
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(map[string]any{"models": []any{}}); err != nil {
+		if err := json.NewEncoder(w).Encode(map[string]any{"models": mgr.ListModels()}); err != nil {
 			http.Error(w, "failed to encode response", http.StatusInternalServerError)
 			return
 		}
 	})
 
 	r.Get("/status", func(w http.ResponseWriter, r *http.Request) {
-		s := mgr.Snapshot()
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(map[string]any{
-			"state":         s.State,
-			"current_model": s.CurrentModel,
-			"error":         s.Err,
-		}); err != nil {
+		if err := json.NewEncoder(w).Encode(mgr.Status()); err != nil {
 			http.Error(w, "failed to encode response", http.StatusInternalServerError)
 			return
 		}
@@ -43,27 +37,24 @@ func NewMux(mgr *manager.Manager) http.Handler {
 			return
 		}
 
-		// Ensure model as per rules: if empty -> no change; if same -> no change; if diff -> switch
-		if err := mgr.EnsureModel(r.Context(), req.Model); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		// Simple NDJSON streaming placeholder
+		// Stream NDJSON via manager.Infer (centralized logic)
 		w.Header().Set("Content-Type", "application/x-ndjson")
-		flusher, _ := w.(http.Flusher)
-		// Emit a few fake tokens quickly to illustrate streaming
-		chunks := []string{"{\"token\":\"Hello\"}", "{\"token\":\",\"}", "{\"token\":\" world\"}", "{\"done\":true}"}
-		for i, ch := range chunks {
-			if _, err := w.Write([]byte(ch + "\n")); err != nil {
+		var flush func()
+		if f, ok := w.(http.Flusher); ok {
+			flush = f.Flush
+		}
+		if err := mgr.Infer(r.Context(), req, w, flush); err != nil {
+			// If context was canceled (client disconnect), just return.
+			if r.Context().Err() != nil {
 				return
 			}
-			if flusher != nil {
-				flusher.Flush()
+			// Map queue/backpressure to 429
+			if manager.IsTooBusy(err) {
+				http.Error(w, err.Error(), http.StatusTooManyRequests)
+				return
 			}
-			if i < len(chunks)-1 {
-				time.Sleep(10 * time.Millisecond)
-			}
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
 	})
 

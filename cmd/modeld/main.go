@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"modeld/internal/httpapi"
+	"modeld/internal/registry"
 	"modeld/internal/manager"
 )
 
@@ -22,10 +23,17 @@ func main() {
 	}
 	addr := flag.String("addr", defaultAddr, "HTTP listen address, e.g. :8080")
 	cfgPath := flag.String("config", "configs/models.yaml", "Path to models config YAML")
+	vramBudgetMB := flag.Int("vram-budget-mb", 0, "VRAM budget in MB for all instances (0=unlimited)")
+	vramMarginMB := flag.Int("vram-margin-mb", 0, "Reserved VRAM margin in MB to keep free")
+	defaultModel := flag.String("default-model", "", "Default model id when request omits model")
 	flag.Parse()
 
-	// TODO: load registry from cfgPath
-	mgr := manager.New()
+	// Load registry from cfgPath
+	reg, err := registry.Load(*cfgPath)
+	if err != nil {
+		log.Fatalf("failed to load registry: %v", err)
+	}
+	mgr := manager.New(reg, *vramBudgetMB, *vramMarginMB, *defaultModel)
 
 	mux := httpapi.NewMux(mgr) // registers /models, /status, /switch, /events, /healthz (stubs)
 	srv := &http.Server{Addr: *addr, Handler: mux}
