@@ -42,7 +42,6 @@ func NewMux(svc Service) http.Handler {
 	})
 
 	r.Get("/models", func(w http.ResponseWriter, r *http.Request) {
-		// TODO: read from config/registry
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(map[string]any{"models": svc.ListModels()}); err != nil {
 			writeJSONError(w, http.StatusInternalServerError, "failed to encode response")
