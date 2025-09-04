@@ -3,9 +3,11 @@ package httpapi
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"modeld/internal/manager"
+	"modeld/pkg/types"
 )
 
 func NewMux(mgr *manager.Manager) http.Handler {
@@ -34,29 +36,35 @@ func NewMux(mgr *manager.Manager) http.Handler {
 		}
 	})
 
-	r.Post("/switch", func(w http.ResponseWriter, r *http.Request) {
-		var req struct{ ModelID string `json:"model_id"` }
+	r.Post("/infer", func(w http.ResponseWriter, r *http.Request) {
+		var req types.InferRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "invalid JSON body", http.StatusBadRequest)
 			return
 		}
-		op, err := mgr.Switch(r.Context(), req.ModelID)
-		if err != nil {
+
+		// Ensure model as per rules: if empty -> no change; if same -> no change; if diff -> switch
+		if err := mgr.EnsureModel(r.Context(), req.Model); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusAccepted)
-		if err := json.NewEncoder(w).Encode(map[string]string{"op_id": op}); err != nil {
-			http.Error(w, "failed to encode response", http.StatusInternalServerError)
-			return
-		}
-	})
 
-	r.Get("/events", func(w http.ResponseWriter, r *http.Request) {
-		// TODO: SSE hub
-		w.Header().Set("Content-Type", "text/event-stream")
-		w.Write([]byte("event: message\ndata: {\"event\":\"snapshot\",\"data\":{\"state\":\"loading\"}}\n\n"))
+		// Simple NDJSON streaming placeholder
+		w.Header().Set("Content-Type", "application/x-ndjson")
+		flusher, _ := w.(http.Flusher)
+		// Emit a few fake tokens quickly to illustrate streaming
+		chunks := []string{"{\"token\":\"Hello\"}", "{\"token\":\",\"}", "{\"token\":\" world\"}", "{\"done\":true}"}
+		for i, ch := range chunks {
+			if _, err := w.Write([]byte(ch + "\n")); err != nil {
+				return
+			}
+			if flusher != nil {
+				flusher.Flush()
+			}
+			if i < len(chunks)-1 {
+				time.Sleep(10 * time.Millisecond)
+			}
+		}
 	})
 
 	// Liveness probe - process is up
