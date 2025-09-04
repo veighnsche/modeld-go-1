@@ -1,0 +1,14 @@
+# Go
+bin/
+*.exe
+*.test
+*.out
+coverage.txt
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
