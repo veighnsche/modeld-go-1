@@ -21,27 +21,21 @@ type Manager struct {
 	usedEstMB    int
 	// TODO: subscribers, op ids, queue
 
-	// Queue config (MVP defaults)
+	// Queue config
 	maxQueueDepth int
 	maxWait       time.Duration
 }
 
-const (
-	defaultMaxQueueDepth = 32
-	defaultMaxWait       = 30 * time.Second
-)
-
 func New(reg []types.Model, budgetMB, marginMB int, defaultModel string) *Manager {
-	return &Manager{
-		state:         StateLoading,
-		registry:      reg,
-		budgetMB:      budgetMB,
-		marginMB:      marginMB,
-		defaultModel:  defaultModel,
-		instances:     make(map[string]*Instance),
-		maxQueueDepth: defaultMaxQueueDepth,
-		maxWait:       defaultMaxWait,
-	}
+    // Delegate to NewWithConfig to centralize defaults and option parsing
+    return NewWithConfig(ManagerConfig{
+        Registry:      reg,
+        BudgetMB:      budgetMB,
+        MarginMB:      marginMB,
+        DefaultModel:  defaultModel,
+        MaxQueueDepth: 0,            // use package defaults
+        MaxWait:       0,            // use package defaults
+    })
 }
 
 func (m *Manager) Ready() bool {

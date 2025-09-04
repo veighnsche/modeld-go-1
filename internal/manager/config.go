@@ -6,6 +6,12 @@ import (
 	"modeld/pkg/types"
 )
 
+// Defaults applied when corresponding ManagerConfig fields are unset.
+const (
+	defaultMaxQueueDepth = 32
+	defaultMaxWait       = 30 * time.Second
+)
+
 // ManagerConfig encapsulates all tunables for Manager construction.
 type ManagerConfig struct {
 	Registry     []types.Model
