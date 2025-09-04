@@ -41,9 +41,75 @@ jobs:
       - name: Download dependencies
         run: go mod download
 
+      - name: Verify module files tidy
+        run: |
+          set -euo pipefail
+          go mod tidy
+          if ! git diff --quiet -- go.mod go.sum; then
+            echo "go.mod/go.sum are not tidy. Run 'go mod tidy' and commit the changes." >&2
+            git --no-pager diff -- go.mod go.sum || true
+            exit 1
+          fi
+
+      - name: Check formatting (gofmt)
+        run: |
+          set -euo pipefail
+          unformatted=$(gofmt -l . | grep -v '^vendor/' || true)
+          if [ -n "$unformatted" ]; then
+            echo "The following files are not gofmt-formatted:" >&2
+            echo "$unformatted" >&2
+            exit 1
+          fi
+
+      - name: Static analysis (go vet)
+        run: |
+          set -euo pipefail
+          go vet ./...
+
+      - name: Static analysis (go vet with swagger tag)
+        run: |
+          set -euo pipefail
+          go vet -tags=swagger ./...
+
+      - name: Generate Swagger docs
+        run: |
+          set -euo pipefail
+          go run github.com/swaggo/swag/cmd/swag@latest init -g cmd/modeld/main.go -o docs
+
+      - name: Validate Swagger artifacts exist
+        run: |
+          set -euo pipefail
+          test -f docs/swagger.json || { echo "docs/swagger.json missing" >&2; exit 1; }
+          test -f docs/swagger.yaml || { echo "docs/swagger.yaml missing" >&2; exit 1; }
+          test -f docs/docs.go || { echo "docs/docs.go missing" >&2; exit 1; }
+
+      - name: Verify Swagger docs up-to-date
+        run: |
+          set -euo pipefail
+          # Fail if running generation produced a diff (i.e., docs were stale)
+          if ! git diff --quiet -- docs; then
+            echo "Swagger docs are out of date. Run 'make swagger-gen' locally and commit the changes." >&2
+            git --no-pager diff -- docs || true
+            exit 1
+          fi
+
+      - name: Compile (default build)
+        run: |
+          set -euo pipefail
+          go build ./...
+
+      - name: Compile (swagger build tag)
+        run: |
+          set -euo pipefail
+          go build -tags=swagger ./...
+
       - name: Run tests with coverage
         run: |
           go test ./... -covermode=atomic -coverprofile=coverage.out -v
+
+      - name: Run tests with race detector
+        run: |
+          go test -race ./...
 
       - name: Enforce minimum coverage (80%)
         run: |
