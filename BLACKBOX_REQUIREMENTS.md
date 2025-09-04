@@ -90,6 +90,33 @@ Note: For in‑process tests, `httptest.NewServer(httpapi.NewMux(manager.New(...
   - Request JSON: `{ "prompt": "hi" }`.
   - Assert: `status=404`.
 
+- [HAPPY_SWITCH_EXPLICIT_MODEL] With ≥2 models available, send two requests to exercise switching.
+  - Precondition: registry has at least two models (e.g., `alpha.gguf`, `beta.gguf`).
+  - Step 1: `POST /infer` with `{ "model": "alpha.gguf", "prompt": "A" }` → `200` and NDJSON.
+  - Step 2: `POST /infer` with `{ "model": "beta.gguf", "prompt": "B" }` → `200` and NDJSON.
+  - Assert: both responses return `200`, `Content-Type` includes `application/x-ndjson`, body contains multiple newline-delimited JSON objects.
+  - Assert: subsequent `GET /status` shows at least one instance for each of `alpha.gguf` and `beta.gguf` (≥2 total), or otherwise reflects the most recent model ready depending on budgeting.
+
+- [HAPPY_DEFAULT_THEN_EXPLICIT] Start with default-only infer, then switch explicitly.
+  - Precondition: `--default-model` set to `alpha.gguf`; `beta.gguf` also exists.
+  - Step 1: `POST /infer` with `{ "prompt": "hello" }` (no model) → uses default `alpha.gguf`.
+  - Step 2: `POST /infer` with `{ "model": "beta.gguf", "prompt": "hi" }`.
+  - Assert: both `200` with NDJSON; `GET /readyz` becomes `200` after the first infer if not already.
+
+- [HAPPY_REPEAT_INFER_SAME_MODEL] Multiple inference requests on the same model are independently successful and return NDJSON.
+  - Steps: send two sequential `POST /infer` calls for `alpha.gguf`.
+  - Assert: both `200`, NDJSON lines; `GET /status` maintains or updates `LastUsed` for the instance (if exposed); readiness remains `200`.
+
+- [HAPPY_CONTENT_TYPE_AND_STREAMING] Validate streaming and headers more strictly.
+  - Assert: `Content-Type` is exactly `application/x-ndjson` (or contains it), response body contains at least two lines, last line contains a terminal marker like `{ "done": true }` (per current stub), and no single line is empty.
+
+- [HAPPY_READY_AFTER_SWITCH] After switching models with an explicit infer, readiness remains `200`.
+  - Steps: infer default; poll `readyz` to `200`; infer explicit other model; verify `readyz` still `200`.
+
+- [HAPPY_MODELS_LIST_CONTAINS_DEFAULT] `/models` response includes the configured default model id.
+  - Precondition: server started with `--default-model` set to an existing id.
+  - Assert: the `models` array contains an entry with that id.
+
 - [TOO_BUSY_429] Under configured backpressure conditions, returns `429 Too Many Requests`.
   - Precondition: configure manager to a tiny per‑instance queue (see `ManagerConfig` via constructor, or run two concurrent `/infer` requests to the same model when only one in‑flight is allowed). In current implementation, backpressure mapping is exposed when `tooBusyError` is returned inside `manager`.
   - Action: start one long‑running `/infer` (e.g., hold the connection or simulate delay), then immediately send another `/infer` for the same model.

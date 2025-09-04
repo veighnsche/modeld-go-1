@@ -5,7 +5,7 @@ COVER_PROFILE := coverage.out
 COVER_MODE := atomic
 COVER_THRESHOLD ?= 80
 
-.PHONY: build run tidy clean test cover cover-html cover-check
+.PHONY: build run tidy clean test cover cover-html cover-check e2e-py
 
 build:
 	@mkdir -p bin
@@ -35,3 +35,7 @@ cover-html: cover
 cover-check: cover
 	@percent=$(shell go tool cover -func=$(COVER_PROFILE) | awk '/^total:/ {gsub("%","",$$3); print $$3}') ; \
 	awk -v p="$$percent" -v t="$(COVER_THRESHOLD)" 'BEGIN { if (p+0 < t+0) { printf("Coverage %.2f%% is below threshold %d%%\n", p, t); exit 1 } else { printf("Coverage %.2f%% meets threshold %d%%\n", p, t); exit 0 } }'
+
+e2e-py:
+	@python3 -m venv .venv
+	@source .venv/bin/activate && pip install -r tests/e2e_py/requirements.txt && pytest -q tests/e2e_py

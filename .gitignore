@@ -12,3 +12,10 @@ coverage.txt
 
 # OS
 .DS_Store
+
+# Python virtual envs
+.venv/
+venv/
+
+# pycache
+__pycache__
