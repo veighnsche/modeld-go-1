@@ -6,30 +6,43 @@ import (
     "encoding/json"
     "io"
     "net/http"
-    "net/http/httptest"
-    "os"
-    "path/filepath"
     "testing"
     "time"
 
     "modeld/internal/httpapi"
     "modeld/internal/manager"
-    "modeld/internal/registry"
     "modeld/pkg/types"
 )
 
-// createTempModelsDir creates a temporary directory populated with empty .gguf files
-// and returns the directory path and the list of model IDs (filenames).
-func createTempModelsDir(t *testing.T, names ...string) (string, []string) {
-    t.Helper()
-    dir := t.TempDir()
-    for _, n := range names {
-        p := filepath.Join(dir, n)
-        if err := os.WriteFile(p, []byte(""), 0o644); err != nil {
-            t.Fatalf("write temp model %s: %v", p, err)
-        }
+// Helpers are defined in helpers_test.go
+
+// TestE2E_Config_CORS_And_InferTimeout ensures the mux honors package-level
+// httpapi configuration for CORS and infer timeout behavior.
+func TestE2E_Config_CORS_And_InferTimeout(t *testing.T) {
+    dir, models := createTempModelsDir(t, "alpha.gguf")
+    // Set package-level options
+    httpapi.SetCORSOptions(true, []string{"http://example.com"}, []string{"GET", "POST", "OPTIONS"}, []string{"Content-Type"})
+    httpapi.SetInferTimeoutSeconds(1) // very small timeout; our stub infer should still complete in time
+
+    // Spin up server
+    srv, _ := newServerForDir(t, dir, 0, 0, models[0])
+
+    // Preflight request should include CORS headers
+    req, _ := http.NewRequest(http.MethodOptions, srv.URL+"/infer", nil)
+    req.Header.Set("Origin", "http://example.com")
+    req.Header.Set("Access-Control-Request-Method", "POST")
+    resp, err := http.DefaultClient.Do(req)
+    if err != nil { t.Fatalf("preflight err: %v", err) }
+    _ = resp.Body.Close()
+    if ao := resp.Header.Get("Access-Control-Allow-Origin"); ao == "" {
+        t.Fatalf("expected CORS allow origin header, got none")
     }
-    return dir, names
+
+    // Normal infer should still succeed
+    r, body := httpPostJSON(t, srv.URL+"/infer", []byte(`{"prompt":"hello"}`))
+    if r.StatusCode != http.StatusOK {
+        t.Fatalf("infer status=%d body=%s", r.StatusCode, string(body))
+    }
 }
 
 // TestE2E_Backpressure429 verifies we return 429 Too Many Requests when the per-instance
@@ -73,59 +86,9 @@ func TestE2E_Backpressure429(t *testing.T) {
     }
 }
 
-func newServerForDir(t *testing.T, modelsDir string, budgetMB, marginMB int, defaultModel string) (*httptest.Server, *manager.Manager) {
-    t.Helper()
-    // Scan the directory for models
-    reg, err := registry.NewGGUFScanner().Scan(modelsDir)
-    if err != nil {
-        t.Fatalf("scan models: %v", err)
-    }
-    // Construct manager with discovered registry
-    mgr := manager.New(reg, budgetMB, marginMB, defaultModel)
-    // Build HTTP mux and start test server
-    mux := httpapi.NewMux(mgr)
-    srv := httptest.NewServer(mux)
-    t.Cleanup(srv.Close)
-    return srv, mgr
-}
+// newServerForDir and newServerForDirWithConfig are provided by helpers_test.go
 
-// newServerForDirWithConfig allows configuring queue/backpressure behavior for tests.
-func newServerForDirWithConfig(t *testing.T, modelsDir string, cfg manager.ManagerConfig) (*httptest.Server, *manager.Manager) {
-    t.Helper()
-    reg, err := registry.NewGGUFScanner().Scan(modelsDir)
-    if err != nil {
-        t.Fatalf("scan models: %v", err)
-    }
-    cfg.Registry = reg
-    mgr := manager.NewWithConfig(cfg)
-    mux := httpapi.NewMux(mgr)
-    srv := httptest.NewServer(mux)
-    t.Cleanup(srv.Close)
-    return srv, mgr
-}
-
-func httpGet(t *testing.T, url string) (*http.Response, []byte) {
-    t.Helper()
-    req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
-    if err != nil { t.Fatalf("new req: %v", err) }
-    resp, err := http.DefaultClient.Do(req)
-    if err != nil { t.Fatalf("do req: %v", err) }
-    body, _ := io.ReadAll(resp.Body)
-    _ = resp.Body.Close()
-    return resp, body
-}
-
-func httpPostJSON(t *testing.T, url string, payload []byte) (*http.Response, []byte) {
-    t.Helper()
-    req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, url, bytes.NewReader(payload))
-    if err != nil { t.Fatalf("new req: %v", err) }
-    req.Header.Set("Content-Type", "application/json")
-    resp, err := http.DefaultClient.Do(req)
-    if err != nil { t.Fatalf("do req: %v", err) }
-    body, _ := io.ReadAll(resp.Body)
-    _ = resp.Body.Close()
-    return resp, body
-}
+// httpGet and httpPostJSON are provided by helpers_test.go
 
 func TestE2E_Models_Infer_Ready_Status(t *testing.T) {
     // Arrange: create a temp models dir with two .gguf files

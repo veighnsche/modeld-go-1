@@ -10,6 +10,10 @@ permissions:
   contents: read
   pull-requests: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     name: Test (Go)
@@ -64,6 +68,9 @@ jobs:
   e2e-python:
     name: E2E (Python)
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [ '3.10', '3.11', '3.12' ]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -79,7 +86,15 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: ${{ matrix.python-version }}
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('tests/e2e_py/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
 
       - name: Install Python dependencies
         run: |
@@ -87,4 +102,15 @@ jobs:
           pip install -r tests/e2e_py/requirements.txt
 
       - name: Run Python E2E tests
-        run: pytest -q tests/e2e_py
+        run: |
+          set -o pipefail
+          pytest -q tests/e2e_py --junitxml=pytest-report.xml 2>&1 | tee pytest-output.txt
+
+      - name: Upload pytest artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-artifacts-${{ matrix.python-version }}
+          path: |
+            pytest-report.xml
+            pytest-output.txt
