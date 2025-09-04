@@ -1,5 +1,8 @@
 # modeld-go (scaffold)
 
+![CI](https://github.com/veighnsche/modeld-go-1/actions/workflows/ci.yml/badge.svg)
+[![codecov](https://codecov.io/gh/veighnsche/modeld-go-1/graph/badge.svg)](https://codecov.io/gh/veighnsche/modeld-go-1)
+
 Minimal scaffold for a Go control-plane around llama.cpp:
 - Model switching
 - Readiness + events (SSE/WebSocket later)
