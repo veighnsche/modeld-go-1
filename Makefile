@@ -24,7 +24,8 @@ test:
 	@go test ./... -v
 
 cover:
-	@go test ./... -covermode=$(COVER_MODE) -coverprofile=$(COVER_PROFILE) -v
+	@pkgs=$$(go list ./... | grep -v '^modeld/cmd/'); \
+	go test $$pkgs -covermode=$(COVER_MODE) -coverprofile=$(COVER_PROFILE) -v
 	@echo "Coverage profile written to $(COVER_PROFILE)"
 
 cover-html: cover
