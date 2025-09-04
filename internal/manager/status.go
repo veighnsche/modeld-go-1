@@ -29,6 +29,8 @@ func (m *Manager) Status() types.StatusResponse {
 			LastUsed:  inst.LastUsed.Unix(),
 			EstVRAMMB: inst.EstVRAMMB,
 			QueueLen:  len(inst.queueCh),
+			Inflight:  len(inst.genCh),
+			MaxQueueDepth: cap(inst.queueCh),
 		})
 	}
 	return resp

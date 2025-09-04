@@ -32,6 +32,47 @@ func createTempModelsDir(t *testing.T, names ...string) (string, []string) {
     return dir, names
 }
 
+// TestE2E_Backpressure429 verifies we return 429 Too Many Requests when the per-instance
+// queue is full and the wait timeout elapses.
+func TestE2E_Backpressure429(t *testing.T) {
+    // Arrange: tiny queue depth and short wait to elicit 429 deterministically.
+    dir, models := createTempModelsDir(t, "alpha.gguf")
+    cfg := manager.ManagerConfig{
+        BudgetMB:      0,
+        MarginMB:      0,
+        DefaultModel:  models[0],
+        MaxQueueDepth: 1,                 // one waiting request besides the in-flight
+        MaxWait:       5 * time.Millisecond,
+    }
+    srv, _ := newServerForDirWithConfig(t, dir, cfg)
+
+    // Helper to POST /infer and return status code.
+    doInfer := func() int {
+        req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, srv.URL+"/infer", bytes.NewBufferString(`{"prompt":"hello"}`))
+        if err != nil { t.Fatalf("new req: %v", err) }
+        req.Header.Set("Content-Type", "application/json")
+        resp, err := http.DefaultClient.Do(req)
+        if err != nil { t.Fatalf("do req: %v", err) }
+        io.Copy(io.Discard, resp.Body)
+        resp.Body.Close()
+        return resp.StatusCode
+    }
+
+    // Kick off three concurrent requests. With queue depth 1 and single in-flight,
+    // the third should fail fast with 429 due to MaxWait elapsing while queue slot is unavailable.
+    done := make(chan int, 3)
+    go func(){ done <- doInfer() }() // first should be 200
+    go func(){ done <- doInfer() }() // second should be 200 (queued then runs)
+    go func(){ done <- doInfer() }() // third should be 429
+
+    // Collect results
+    s1, s2, s3 := <-done, <-done, <-done
+    got429 := (s1 == http.StatusTooManyRequests) || (s2 == http.StatusTooManyRequests) || (s3 == http.StatusTooManyRequests)
+    if !got429 {
+        t.Fatalf("expected at least one 429 status, got: %d, %d, %d", s1, s2, s3)
+    }
+}
+
 func newServerForDir(t *testing.T, modelsDir string, budgetMB, marginMB int, defaultModel string) (*httptest.Server, *manager.Manager) {
     t.Helper()
     // Scan the directory for models
@@ -42,6 +83,21 @@ func newServerForDir(t *testing.T, modelsDir string, budgetMB, marginMB int, def
     // Construct manager with discovered registry
     mgr := manager.New(reg, budgetMB, marginMB, defaultModel)
     // Build HTTP mux and start test server
+    mux := httpapi.NewMux(mgr)
+    srv := httptest.NewServer(mux)
+    t.Cleanup(srv.Close)
+    return srv, mgr
+}
+
+// newServerForDirWithConfig allows configuring queue/backpressure behavior for tests.
+func newServerForDirWithConfig(t *testing.T, modelsDir string, cfg manager.ManagerConfig) (*httptest.Server, *manager.Manager) {
+    t.Helper()
+    reg, err := registry.NewGGUFScanner().Scan(modelsDir)
+    if err != nil {
+        t.Fatalf("scan models: %v", err)
+    }
+    cfg.Registry = reg
+    mgr := manager.NewWithConfig(cfg)
     mux := httpapi.NewMux(mgr)
     srv := httptest.NewServer(mux)
     t.Cleanup(srv.Close)

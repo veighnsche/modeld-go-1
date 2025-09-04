@@ -14,6 +14,8 @@ type InstanceStatus struct {
     LastUsed   int64  `json:"last_used_unix"`
     EstVRAMMB  int    `json:"est_vram_mb"`
     QueueLen   int    `json:"queue_len"`
+    Inflight   int    `json:"inflight"`
+    MaxQueueDepth int `json:"max_queue_depth"`
 }
 
 // StatusResponse is returned by GET /status.
