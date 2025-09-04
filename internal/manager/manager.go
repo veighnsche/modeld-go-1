@@ -83,6 +83,12 @@ func (e modelNotFoundError) Error() string { return "model not found: " + e.id }
 
 func ErrModelNotFound(id string) error { return modelNotFoundError{id: id} }
 
+// IsModelNotFound reports whether the error indicates a missing model id.
+func IsModelNotFound(err error) bool {
+    _, ok := err.(modelNotFoundError)
+    return ok
+}
+
 // Instance represents a live model context (one per model id).
 type Instance struct {
 	ID         string

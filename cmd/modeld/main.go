@@ -22,16 +22,16 @@ func main() {
 		defaultAddr = v
 	}
 	addr := flag.String("addr", defaultAddr, "HTTP listen address, e.g. :8080")
-	cfgPath := flag.String("config", "configs/models.yaml", "Path to models config YAML")
+	modelsDir := flag.String("models-dir", "~/models/llm", "Directory to scan for *.gguf model files")
 	vramBudgetMB := flag.Int("vram-budget-mb", 0, "VRAM budget in MB for all instances (0=unlimited)")
 	vramMarginMB := flag.Int("vram-margin-mb", 0, "Reserved VRAM margin in MB to keep free")
 	defaultModel := flag.String("default-model", "", "Default model id when request omits model")
 	flag.Parse()
 
-	// Load registry from cfgPath
-	reg, err := registry.Load(*cfgPath)
+	// Load registry by scanning modelsDir for *.gguf
+	reg, err := registry.LoadDir(*modelsDir)
 	if err != nil {
-		log.Fatalf("failed to load registry: %v", err)
+		log.Fatalf("failed to load models: %v", err)
 	}
 	mgr := manager.New(reg, *vramBudgetMB, *vramMarginMB, *defaultModel)
 
@@ -39,7 +39,7 @@ func main() {
 	srv := &http.Server{Addr: *addr, Handler: mux}
 
 	go func() {
-		log.Printf("modeld listening on %s (config: %s)", *addr, *cfgPath)
+		log.Printf("modeld listening on %s (models dir: %s)", *addr, *modelsDir)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("server error: %v", err)
 		}

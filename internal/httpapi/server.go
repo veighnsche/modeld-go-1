@@ -53,6 +53,11 @@ func NewMux(mgr *manager.Manager) http.Handler {
 				http.Error(w, err.Error(), http.StatusTooManyRequests)
 				return
 			}
+			// Map model-not-found to 404
+			if manager.IsModelNotFound(err) {
+				http.Error(w, err.Error(), http.StatusNotFound)
+				return
+			}
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
