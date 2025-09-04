@@ -7,20 +7,10 @@ import (
 	"testing"
 )
 
-func TestPathExists(t *testing.T) {
-	d := t.TempDir()
-	if !PathExists(d) { t.Fatalf("expected temp dir to exist") }
-	p := filepath.Join(d, "x")
-	if PathExists(p) { t.Fatalf("expected non-existent path to be false") }
-	if err := os.WriteFile(p, []byte("hi"), 0o644); err != nil { t.Fatalf("write: %v", err) }
-	if !PathExists(p) { t.Fatalf("expected file to exist") }
-}
-
 func TestExpandHome(t *testing.T) {
+	// Determine home dir; if unavailable in env, skip
 	home, err := os.UserHomeDir()
-	if err != nil {
-		t.Skip("no home dir available")
-	}
+	if err != nil { t.Skip("no home dir available") }
 	// raw path unaffected
 	if got, err := ExpandHome("/tmp"); err != nil || got != "/tmp" { t.Fatalf("got %q err=%v", got, err) }
 	// empty path

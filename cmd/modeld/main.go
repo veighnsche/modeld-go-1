@@ -137,7 +137,8 @@ func main() {
 	if *corsMethods != "" { methods = splitCSV(*corsMethods) } else { methods = []string{"GET", "POST", "OPTIONS"} }
 	if *corsHeaders != "" { headers = splitCSV(*corsHeaders) } else { headers = []string{"Accept", "Authorization", "Content-Type", "X-Requested-With", "X-Log-Level"} }
 	httpapi.SetCORSOptions(*corsEnabled, origins, methods, headers)
-	mux := httpapi.NewMux(mgr) // registers /models, /status, /switch, /events, /healthz (stubs)
+	// NewMux registers: /models, /status, /infer, /healthz, /readyz, /metrics
+	mux := httpapi.NewMux(mgr)
 	srv := &http.Server{
 		Addr:              *addr,
 		Handler:           mux,

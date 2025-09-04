@@ -36,6 +36,10 @@ func TestMetricsMiddleware_EmitsRequestCounters(t *testing.T) {
     }
     body := mrr.Body.Bytes()
     if !bytes.Contains(body, []byte("modeld_http_requests_total")) {
-        t.Fatalf("expected to find modeld_http_requests_total in metrics; got: %q", string(body[:min(200, len(body))]))
+        // clip body preview to avoid large logs without relying on a min() helper
+        previewLen := len(body)
+        if previewLen > 200 { previewLen = 200 }
+        t.Fatalf("expected to find modeld_http_requests_total in metrics; got: %q", string(body[:previewLen]))
     }
 }
+

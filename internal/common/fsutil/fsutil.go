@@ -1,7 +1,6 @@
 package fsutil
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -25,10 +24,4 @@ func ExpandHome(path string) (string, error) {
 	}
 	// handle cases like ~/models/llm
 	return filepath.Join(home, strings.TrimPrefix(path, "~/")), nil
-}
-
-// PathExists checks if the given path exists.
-func PathExists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil || !errors.Is(err, os.ErrNotExist)
 }

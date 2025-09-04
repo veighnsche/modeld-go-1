@@ -48,6 +48,7 @@ func (s *GGUFScanner) Scan(dir string) ([]types.Model, error) {
 	return models, nil
 }
 
+// Deprecated: Use NewGGUFScanner().Scan(dir) instead.
 // LoadDir is kept for backward compatibility; it uses GGUFScanner under the hood.
 func LoadDir(dir string) ([]types.Model, error) {
 	return NewGGUFScanner().Scan(dir)
