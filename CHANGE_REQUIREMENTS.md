@@ -43,25 +43,9 @@ Each item includes rationale, scope, target files, and acceptance criteria. Use 
 
 ## 3) API Hardening and Versioning
 
-- Versioned API paths
-  - Rationale: Future-proofing breaking changes.
-  - Scope: Move application endpoints under `/v1` (e.g., `/v1/models`, `/v1/status`, `/v1/infer`), keep `/healthz` and `/readyz` at root; add temporary aliases for backward compatibility.
-  - Targets: `internal/httpapi/server.go`, tests (`internal/httpapi/server_test.go`, `internal/e2e/e2e_test.go`, `tests/e2e_py/test_blackbox.py`), `README.md`.
-  - Acceptance: All tests updated and pass using `/v1/*` endpoints.
-
-- OpenAPI specification
-  - Rationale: Enable client codegen and documentation.
-  - Scope: Author `openapi.yaml` describing all endpoints, request/response shapes (including error envelope from `writeJSONError`). Optionally serve `/openapi.json`.
-  - Targets: `api/openapi.yaml` (new), `cmd/modeld/main.go` or `internal/httpapi/server.go` to serve spec.
-  - Acceptance: Spec validates and examples in README match.
+Deferred for now to keep scope focused and velocity high.
 
 ## 4) Request Validation and Controls
-
-- Configurable request body limit
-  - Rationale: 1MiB hardcoded limit in `/infer`.
-  - Scope: Add `--max-body-bytes` flag and config key; default 1MiB. Document.
-  - Targets: `internal/httpapi/server.go`, `cmd/modeld/main.go`, `internal/config/loader.go`, `README.md`.
-  - Acceptance: Changing flag alters allowed body size; tests updated.
 
 - Enrich `InferRequest` with generation parameters
   - Rationale: Typical inference controls missing (max tokens, temperature, etc.).
@@ -91,23 +75,7 @@ Each item includes rationale, scope, target files, and acceptance criteria. Use 
 
 ## 6) Security (Opt-in)
 
-- API key auth
-  - Rationale: Minimal protection for non-public deployments.
-  - Scope: Support `--auth-mode=none|api_key` and `--api-keys` list or file/env.
-  - Targets: `internal/httpapi/server.go` (middleware), `cmd/modeld/main.go`, `README.md`.
-  - Acceptance: Requests without valid key receive 401/403; health endpoints may remain open.
-
-- Basic rate limiting
-  - Rationale: Shield from accidental overload.
-  - Scope: Token-bucket per-IP or per-key; return 429 on exceed.
-  - Targets: `internal/httpapi/server.go` (middleware), tests.
-  - Acceptance: Deterministic throttling verified by tests.
-
-- TLS/mTLS configuration
-  - Rationale: Production-readiness.
-  - Scope: Add `--tls-cert`, `--tls-key`, optional client CA for mTLS; document.
-  - Targets: `cmd/modeld/main.go`, `README.md`.
-  - Acceptance: Server can start with TLS; basic manual verification.
+Deferred; consider in a future phase if deployment context requires it.
 
 ## 7) Readiness, Warmup, and Status Enrichment
 
@@ -125,23 +93,12 @@ Each item includes rationale, scope, target files, and acceptance criteria. Use 
 
 ## 8) Middlewares and Headers
 
-- Compression
-  - Rationale: Save bandwidth for `/models` and `/status`.
-  - Scope: Add `middleware.Compress(5)`.
-  - Targets: `internal/httpapi/server.go`.
-  - Acceptance: Responses include `Content-Encoding: gzip` when requested.
-
 - CORS
   - Rationale: Browser clients support.
   - Scope: Add configurable CORS (origins, methods, headers) and defaults.
   - Targets: `internal/httpapi/server.go`, `cmd/modeld/main.go`.
   - Acceptance: Preflight succeeds under configured origins.
 
-- Security headers
-  - Rationale: Best practices.
-  - Scope: Set `X-Content-Type-Options: nosniff` and similar where appropriate.
-  - Targets: `internal/httpapi/server.go`.
-  - Acceptance: Headers present on responses.
 
 ## 9) CI/CD and Tooling
 
@@ -156,12 +113,6 @@ Each item includes rationale, scope, target files, and acceptance criteria. Use 
   - Scope: Multi-stage build; non-root; minimal base; read-only FS.
   - Targets: `Dockerfile` (new), `README.md`.
   - Acceptance: `docker build` succeeds; image runs and passes healthz.
-
-- Build info endpoint
-  - Rationale: Traceability.
-  - Scope: `/build` endpoint returning `version`, `commit`, `built_at`; pass via `-ldflags` in build.
-  - Targets: `cmd/modeld/main.go`, `Makefile`, `internal/httpapi/server.go` (route), CI to set ldflags.
-  - Acceptance: Endpoint returns info; logs include build fields.
 
 ## 10) Developer Experience
 
@@ -191,34 +142,24 @@ Each item includes rationale, scope, target files, and acceptance criteria. Use 
   - Targets: `internal/manager/*_test.go`, `internal/httpapi/server_test.go`.
   - Acceptance: Deterministic tests covering 404/429/500, client-cancel, shutdown.
 
-- Load and rate tests (optional)
-  - Rationale: Backpressure behavior under load.
-  - Scope: Add a simple Go or Python script to drive concurrency and assert 429 ratios.
-  - Targets: `tests/load/` (new).
-  - Acceptance: Script runs locally; not mandatory in CI.
+<!-- Optional load and rate tests are omitted for now to keep scope minimal. -->
 
 ## 12) Security and Privacy
 
-- Prompt handling policy
-  - Rationale: Avoid accidental logging of sensitive data.
-  - Scope: Configurable prompt logging policy: `redact`, `hash`, or `plain` (default `redact`).
-  - Targets: `internal/httpapi/server.go`, `README.md`.
-  - Acceptance: Logs reflect policy.
+Deferred; current defaults avoid logging full prompts unless request-level debug is enabled.
 
 ---
 
 ## Proposed PR Sequence
 
 1. Observability baseline
-   - Structured logging, `/metrics`, max body bytes config, compression.
-2. API hardening
-   - `/v1` routes, OpenAPI spec, enriched `InferRequest`, and validation.
-3. Reliability and config
+   - Structured logging, `/metrics`, keep body size and compression.
+2. Reliability and config
    - Backpressure flags/config, request timeouts, optional prewarm.
-4. Security (opt-in)
-   - API key auth and rate limiting.
-5. CI/CD and DX
-   - Race tests, linting, Dockerfile, build info endpoint, example configs.
+3. Request model improvements
+   - Enrich `InferRequest` and add validation.
+4. CI/CD and DX
+   - Race tests, linting, Dockerfile, example configs.
 
 ---
 
@@ -239,6 +180,5 @@ Each item includes rationale, scope, target files, and acceptance criteria. Use 
 
 ## Notes
 
-- Keep backward-compatible aliases during transitions (e.g., old route paths) and deprecate in README.
 - When expanding `InferRequest`, ensure tests assert validation and the terminal `{"done": true}` line.
 - Avoid logging secrets or full prompts by default. Provide per-request override via headers for debugging sessions.
