@@ -48,7 +48,8 @@ func main() {
 	}
 
 	// Load registry by scanning modelsDir for *.gguf
-	reg, err := registry.LoadDir(*modelsDir)
+	scanner := registry.NewGGUFScanner()
+	reg, err := scanner.Scan(*modelsDir)
 	if err != nil {
 		log.Fatalf("failed to load models: %v", err)
 	}

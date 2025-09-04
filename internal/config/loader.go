@@ -2,11 +2,10 @@ package config
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
-    "strings"
+	"strings"
 
 	toml "github.com/pelletier/go-toml/v2"
 	"gopkg.in/yaml.v3"
@@ -44,10 +43,4 @@ func Load(path string) (Config, error) {
 		return cfg, fmt.Errorf("unsupported config extension: %s", ext)
 	}
 	return cfg, nil
-}
-
-// Exists checks if the given path exists.
-func Exists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil || !errors.Is(err, os.ErrNotExist)
 }

@@ -41,6 +41,12 @@ jobs:
         run: |
           go test ./... -covermode=atomic -coverprofile=coverage.out -v
 
+      - name: Enforce minimum coverage (80%)
+        run: |
+          threshold=80
+          percent=$(go tool cover -func=coverage.out | awk '/^total:/ {gsub("%","",$3); print $3}')
+          awk -v p="$percent" -v t="$threshold" 'BEGIN { if (p+0 < t+0) { printf("Coverage %.2f%% is below threshold %d%%\n", p, t); exit 1 } else { printf("Coverage %.2f%% meets threshold %d%%\n", p, t); exit 0 } }'
+
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v4
         with:
