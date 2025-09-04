@@ -4,8 +4,8 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-ExecStart=%h/Projects/modeld-go/bin/modeld --config %h/Projects/modeld-go/configs/models.yaml --addr :8080
-WorkingDirectory=%h/Projects/modeld-go
+ExecStart=%h/Projects/modeld-go-1/bin/modeld --config %h/Projects/modeld-go-1/configs/models.yaml --addr :8080
+WorkingDirectory=%h/Projects/modeld-go-1
 Restart=on-failure
 Environment=GOMAXPROCS=0
 NoNewPrivileges=true
