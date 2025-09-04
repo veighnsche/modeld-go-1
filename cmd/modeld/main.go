@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"modeld/internal/httpapi"
+	"modeld/internal/config"
 	"modeld/internal/registry"
 	"modeld/internal/manager"
 )
@@ -22,11 +23,29 @@ func main() {
 		defaultAddr = v
 	}
 	addr := flag.String("addr", defaultAddr, "HTTP listen address, e.g. :8080")
+	configPath := flag.String("config", "", "Optional path to config file (yaml|yml|json|toml)")
 	modelsDir := flag.String("models-dir", "~/models/llm", "Directory to scan for *.gguf model files")
 	vramBudgetMB := flag.Int("vram-budget-mb", 0, "VRAM budget in MB for all instances (0=unlimited)")
 	vramMarginMB := flag.Int("vram-margin-mb", 0, "Reserved VRAM margin in MB to keep free")
 	defaultModel := flag.String("default-model", "", "Default model id when request omits model")
 	flag.Parse()
+
+	// Determine which flags were explicitly set to give CLI precedence over config file
+	setFlags := map[string]bool{}
+	flag.Visit(func(f *flag.Flag) { setFlags[f.Name] = true })
+
+	// If config file provided, load and merge (only apply fields for flags not explicitly set)
+	if *configPath != "" {
+		if cfg, err := config.Load(*configPath); err != nil {
+			log.Fatalf("failed to load config file: %v", err)
+		} else {
+			if !setFlags["addr"] && cfg.Addr != "" { *addr = cfg.Addr }
+			if !setFlags["models-dir"] && cfg.ModelsDir != "" { *modelsDir = cfg.ModelsDir }
+			if !setFlags["vram-budget-mb"] && cfg.VRAMBudgetMB != 0 { *vramBudgetMB = cfg.VRAMBudgetMB }
+			if !setFlags["vram-margin-mb"] && cfg.VRAMMarginMB != 0 { *vramMarginMB = cfg.VRAMMarginMB }
+			if !setFlags["default-model"] && cfg.DefaultModel != "" { *defaultModel = cfg.DefaultModel }
+		}
+	}
 
 	// Load registry by scanning modelsDir for *.gguf
 	reg, err := registry.LoadDir(*modelsDir)
@@ -39,7 +58,11 @@ func main() {
 	srv := &http.Server{Addr: *addr, Handler: mux}
 
 	go func() {
-		log.Printf("modeld listening on %s (models dir: %s)", *addr, *modelsDir)
+		if *configPath != "" {
+			log.Printf("modeld listening on %s (models dir: %s, config: %s)", *addr, *modelsDir, *configPath)
+		} else {
+			log.Printf("modeld listening on %s (models dir: %s)", *addr, *modelsDir)
+		}
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("server error: %v", err)
 		}
