@@ -3,6 +3,7 @@ package httpapi
 import (
 	"encoding/json"
 	"net/http"
+	"modeld/pkg/types"
 )
 
 // HTTPError allows services to provide an HTTP status code for an error.
@@ -15,8 +16,5 @@ type HTTPError interface {
 func writeJSONError(w http.ResponseWriter, status int, msg string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(map[string]any{
-		"error": msg,
-		"code":  status,
-	})
+	_ = json.NewEncoder(w).Encode(types.ErrorResponse{Error: msg, Code: status})
 }

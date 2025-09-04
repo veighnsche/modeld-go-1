@@ -54,23 +54,84 @@ func NewMux(svc Service) http.Handler {
 		}))
 	}
 
-	r.Get("/models", func(w http.ResponseWriter, r *http.Request) {
+	// Register routes
+	r.Get("/models", getModels(svc))
+
+	r.Get("/status", getStatus(svc))
+
+	r.Post("/infer", postInfer(svc))
+
+	r.Get("/healthz", getHealthz())
+
+	r.Get("/readyz", getReadyz(svc))
+
+	// Prometheus metrics endpoint
+	r.Get("/metrics", promhttp.Handler().ServeHTTP)
+
+	// Optionally mount Swagger UI and docs (no-op unless built with -tags=swagger)
+	MountSwagger(r)
+
+	return r
+}
+
+// writeJSONError is implemented in errors.go
+
+// getModels lists available models.
+// @Summary List models
+// @Description Returns available models discovered by the registry.
+// @Tags models
+// @Produce json
+// @Success 200 {object} types.ModelsResponse
+// @Failure 500 {object} types.ErrorResponse
+// @Router /models [get]
+func getModels(svc Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(map[string]any{"models": svc.ListModels()}); err != nil {
+		resp := types.ModelsResponse{Models: svc.ListModels()}
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
 			writeJSONError(w, http.StatusInternalServerError, "failed to encode response")
 			return
 		}
-	})
+	}
+}
 
-	r.Get("/status", func(w http.ResponseWriter, r *http.Request) {
+// getStatus returns server status.
+// @Summary Server status
+// @Description Returns runtime status of loaded instances and resource usage.
+// @Tags status
+// @Produce json
+// @Success 200 {object} types.StatusResponse
+// @Failure 500 {object} types.ErrorResponse
+// @Router /status [get]
+func getStatus(svc Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(svc.Status()); err != nil {
 			writeJSONError(w, http.StatusInternalServerError, "failed to encode response")
 			return
 		}
-	})
+	}
+}
 
-	r.Post("/infer", func(w http.ResponseWriter, r *http.Request) {
+// postInfer performs inference and streams NDJSON tokens.
+// @Summary Inference
+// @Description Streams inference results as NDJSON lines. Each line is a JSON object.
+// @Tags infer
+// @Accept json
+// @Produce application/x-ndjson
+// @Param request body types.InferRequest true "Inference request"
+// @Param log query string false "Optional per-request log level override: off|error|info|debug"
+// @Param X-Log-Level header string false "Optional per-request log level override: off|error|info|debug"
+// @Param X-Log-Infer header string false "Legacy flag; when '1' enables token debug logging"
+// @Success 200 {string} string "NDJSON stream"
+// @Failure 400 {object} types.ErrorResponse
+// @Failure 404 {object} types.ErrorResponse
+// @Failure 415 {object} types.ErrorResponse
+// @Failure 429 {object} types.ErrorResponse
+// @Failure 500 {object} types.ErrorResponse
+// @Router /infer [post]
+func postInfer(svc Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		// Content-Type check
 		ct := r.Header.Get("Content-Type")
 		if ct == "" || !strings.HasPrefix(strings.ToLower(ct), "application/json") {
@@ -189,14 +250,31 @@ func NewMux(svc Service) http.Handler {
 				log.Printf("infer end status=200 dur=%s", time.Since(start))
 			}
 		}
-	})
+	}
+}
 
-	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
+// getHealthz returns OK for liveness checks.
+// @Summary Health check
+// @Tags health
+// @Produce text/plain
+// @Success 200 {string} string "ok"
+// @Router /healthz [get]
+func getHealthz() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("ok"))
-	})
+	}
+}
 
-	r.Get("/readyz", func(w http.ResponseWriter, r *http.Request) {
+// getReadyz returns readiness status.
+// @Summary Readiness check
+// @Tags health
+// @Produce text/plain
+// @Success 200 {string} string "ready"
+// @Failure 503 {string} string "loading"
+// @Router /readyz [get]
+func getReadyz(svc Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		if svc.Ready() {
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte("ready"))
@@ -204,12 +282,5 @@ func NewMux(svc Service) http.Handler {
 		}
 		w.WriteHeader(http.StatusServiceUnavailable)
 		w.Write([]byte("loading"))
-	})
-
-	// Prometheus metrics endpoint
-	r.Get("/metrics", promhttp.Handler().ServeHTTP)
-
-	return r
+	}
 }
-
-// writeJSONError is implemented in errors.go

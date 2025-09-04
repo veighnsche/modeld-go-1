@@ -5,7 +5,8 @@ COVER_PROFILE := coverage.out
 COVER_MODE := atomic
 COVER_THRESHOLD ?= 80
 
-.PHONY: build run tidy clean test cover cover-html cover-check e2e-py
+.PHONY: build run tidy clean test cover cover-html cover-check e2e-py \
+        swagger-install swagger-gen swagger-build swagger-run
 
 build:
 	@mkdir -p bin
@@ -39,3 +40,21 @@ cover-check: cover
 e2e-py:
 	@python3 -m venv .venv
 	@source .venv/bin/activate && pip install -r tests/e2e_py/requirements.txt && pytest -q tests/e2e_py
+
+# Swagger / OpenAPI helpers
+swagger-install:
+	@go install github.com/swaggo/swag/cmd/swag@latest
+
+swagger-gen:
+	@if command -v swag >/dev/null 2>&1; then \
+		swag init -g cmd/modeld/main.go -o docs ; \
+	else \
+		go run github.com/swaggo/swag/cmd/swag@latest init -g cmd/modeld/main.go -o docs ; \
+	fi
+
+swagger-build:
+	@mkdir -p bin
+	@go build -tags=swagger -o $(BIN) ./cmd/modeld
+
+swagger-run:
+	@go run -tags=swagger ./cmd/modeld

@@ -1,0 +1,334 @@
+definitions:
+  types.ErrorResponse:
+    properties:
+      code:
+        description: |-
+          HTTP status code.
+          example: 400
+        example: 400
+        type: integer
+      error:
+        description: |-
+          Error message.
+          example: invalid JSON body
+        example: invalid JSON body
+        type: string
+    type: object
+  types.InferRequest:
+    properties:
+      max_tokens:
+        description: |-
+          Maximum number of new tokens to generate.
+          example: 128
+        example: 128
+        type: integer
+      model:
+        description: |-
+          Optional model identifier. If empty, the server default is used.
+          example: tinyllama-q4
+        example: tinyllama-q4
+        type: string
+      prompt:
+        description: |-
+          Required prompt text to generate a completion for.
+          example: Write a haiku about the ocean.
+        example: Write a haiku about the ocean.
+        type: string
+      seed:
+        description: |-
+          Random seed for reproducibility; 0 or omitted lets the server choose.
+          example: 42
+        example: 42
+        type: integer
+      stop:
+        description: |-
+          Optional stop sequences. Generation stops when any sequence is matched.
+          example: ["\n\n","END"]
+        example:
+        - '["\n\n"'
+        - '"END"]'
+        items:
+          type: string
+        type: array
+      stream:
+        description: |-
+          If true, stream results as NDJSON tokens. When false, the server may still stream internally but buffer.
+          example: true
+        example: true
+        type: boolean
+      temperature:
+        description: |-
+          Sampling temperature (higher = more random).
+          example: 0.7
+        example: 0.7
+        type: number
+      top_p:
+        description: |-
+          Nucleus sampling probability.
+          example: 0.9
+        example: 0.9
+        type: number
+    type: object
+  types.InstanceStatus:
+    properties:
+      est_vram_mb:
+        description: |-
+          Estimated VRAM usage in MB.
+          example: 1200
+        example: 1200
+        type: integer
+      inflight:
+        description: |-
+          Number of in-flight requests currently being processed.
+          example: 1
+        example: 1
+        type: integer
+      last_used_unix:
+        description: |-
+          Last time this instance served a request (unix seconds).
+          example: 1700000000
+        example: 1700000000
+        type: integer
+      max_queue_depth:
+        description: |-
+          Maximum queued requests allowed before backpressure triggers.
+          example: 32
+        example: 32
+        type: integer
+      model_id:
+        description: |-
+          ID of the model this instance serves.
+          example: tinyllama-q4
+        example: tinyllama-q4
+        type: string
+      queue_len:
+        description: |-
+          Current queue length for incoming requests.
+          example: 0
+        example: 0
+        type: integer
+      state:
+        description: |-
+          Current lifecycle state of the instance (e.g., unloaded, loading, ready).
+          example: ready
+        example: ready
+        type: string
+    type: object
+  types.Model:
+    properties:
+      family:
+        description: |-
+          Optional family (e.g., llama, mistral, phi).
+          example: llama
+        example: llama
+        type: string
+      id:
+        description: |-
+          Stable identifier for the model.
+          example: tinyllama-q4
+        example: tinyllama-q4
+        type: string
+      name:
+        description: |-
+          Human-friendly name.
+          example: TinyLlama (Q4)
+        example: TinyLlama (Q4)
+        type: string
+      path:
+        description: |-
+          Absolute path to the model file on disk.
+          example: /home/user/models/TinyLlama.Q4_K_M.gguf
+        example: /home/user/models/TinyLlama.Q4_K_M.gguf
+        type: string
+      quant:
+        description: |-
+          Quantization level or variant string.
+          example: Q4_K_M
+        example: Q4_K_M
+        type: string
+    type: object
+  types.ModelsResponse:
+    properties:
+      models:
+        description: List of available models.
+        items:
+          $ref: '#/definitions/types.Model'
+        type: array
+    type: object
+  types.StatusResponse:
+    properties:
+      budget_mb:
+        description: |-
+          VRAM budget in MB across all instances.
+          example: 8192
+        example: 8192
+        type: integer
+      error:
+        description: Optional top-level error message.
+        type: string
+      evictions_total:
+        description: |-
+          Total number of evictions performed to free VRAM.
+          example: 5
+        example: 5
+        type: integer
+      instances:
+        description: Loaded/managed instances.
+        items:
+          $ref: '#/definitions/types.InstanceStatus'
+        type: array
+      last_error:
+        description: Last error observed by the manager (if any).
+        type: string
+      loads_total:
+        description: |-
+          Total number of model loads.
+          example: 12
+        example: 12
+        type: integer
+      margin_mb:
+        description: |-
+          Reserved VRAM margin in MB.
+          example: 512
+        example: 512
+        type: integer
+      server_time_unix:
+        description: |-
+          Server time in unix seconds.
+          example: 1700000000
+        example: 1700000000
+        type: integer
+      uptime_seconds:
+        description: |-
+          Uptime of the server in seconds.
+          example: 3600
+        example: 3600
+        type: integer
+      used_est_mb:
+        description: |-
+          Estimated used VRAM in MB.
+          example: 2048
+        example: 2048
+        type: integer
+    type: object
+info:
+  contact: {}
+paths:
+  /healthz:
+    get:
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: ok
+          schema:
+            type: string
+      summary: Health check
+      tags:
+      - health
+  /infer:
+    post:
+      consumes:
+      - application/json
+      description: Streams inference results as NDJSON lines. Each line is a JSON
+        object.
+      parameters:
+      - description: Inference request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/types.InferRequest'
+      - description: 'Optional per-request log level override: off|error|info|debug'
+        in: query
+        name: log
+        type: string
+      - description: 'Optional per-request log level override: off|error|info|debug'
+        in: header
+        name: X-Log-Level
+        type: string
+      - description: Legacy flag; when '1' enables token debug logging
+        in: header
+        name: X-Log-Infer
+        type: string
+      produces:
+      - application/x-ndjson
+      responses:
+        "200":
+          description: NDJSON stream
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/types.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/types.ErrorResponse'
+        "415":
+          description: Unsupported Media Type
+          schema:
+            $ref: '#/definitions/types.ErrorResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/types.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/types.ErrorResponse'
+      summary: Inference
+      tags:
+      - infer
+  /models:
+    get:
+      description: Returns available models discovered by the registry.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.ModelsResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/types.ErrorResponse'
+      summary: List models
+      tags:
+      - models
+  /readyz:
+    get:
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: ready
+          schema:
+            type: string
+        "503":
+          description: loading
+          schema:
+            type: string
+      summary: Readiness check
+      tags:
+      - health
+  /status:
+    get:
+      description: Returns runtime status of loaded instances and resource usage.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.StatusResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/types.ErrorResponse'
+      summary: Server status
+      tags:
+      - status
+swagger: "2.0"
