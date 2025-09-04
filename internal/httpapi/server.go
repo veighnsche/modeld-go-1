@@ -7,6 +7,7 @@ import (
 	"io"
 
 	"github.com/go-chi/chi/v5"
+	"modeld/internal/manager"
 	"modeld/pkg/types"
 )
 
@@ -61,6 +62,15 @@ func NewMux(svc Service) http.Handler {
 		if err := svc.Infer(r.Context(), req, w, flush); err != nil {
 			// If context was canceled (client disconnect), just return.
 			if r.Context().Err() != nil {
+				return
+			}
+			// Map well-known manager errors to HTTP status codes
+			if manager.IsModelNotFound(err) {
+				http.Error(w, err.Error(), http.StatusNotFound)
+				return
+			}
+			if manager.IsTooBusy(err) {
+				http.Error(w, err.Error(), http.StatusTooManyRequests)
 				return
 			}
 			if he, ok := err.(HTTPError); ok {
