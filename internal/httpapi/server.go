@@ -9,6 +9,9 @@ import (
 	"os"
 	"time"
 	"strings"
+	
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/rs/zerolog"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -82,6 +85,25 @@ func SetBaseContext(ctx context.Context) {
     serverBaseCtx = ctx
 }
 
+// maxBodyBytes controls the maximum allowed request body size for JSON endpoints.
+// Default remains 1 MiB for backward compatibility.
+var maxBodyBytes int64 = 1 << 20
+
+// SetMaxBodyBytes allows configuring the maximum request body size.
+func SetMaxBodyBytes(n int64) {
+    if n <= 0 {
+        maxBodyBytes = 1 << 20
+        return
+    }
+    maxBodyBytes = n
+}
+
+// zlog is an optional structured logger. If unset, falls back to log.Printf.
+var zlog *zerolog.Logger
+
+// SetLogger installs a structured logger used by the HTTP layer.
+func SetLogger(l zerolog.Logger) { zlog = &l }
+
 type LogLevel int
 
 const (
@@ -144,6 +166,15 @@ func NewMux(svc Service) http.Handler {
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
+	// Compression for JSON endpoints
+	r.Use(middleware.Compress(5))
+	// Security headers
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("X-Content-Type-Options", "nosniff")
+			next.ServeHTTP(w, r)
+		})
+	})
 
 	r.Get("/models", func(w http.ResponseWriter, r *http.Request) {
 		// TODO: read from config/registry
@@ -169,9 +200,8 @@ func NewMux(svc Service) http.Handler {
 			writeJSONError(w, http.StatusUnsupportedMediaType, "Content-Type must be application/json")
 			return
 		}
-		// Limit body size to 1MiB for MVP
-		const maxBody = 1 << 20
-		r.Body = http.MaxBytesReader(w, r.Body, maxBody)
+		// Limit body size (configurable, default 1MiB)
+		r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
 		var req types.InferRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			// If exceeded size, MaxBytesReader may cause an error; still return 400 to avoid size leak details
@@ -198,7 +228,13 @@ func NewMux(svc Service) http.Handler {
 			writer = io.MultiWriter(w, &loggingLineWriter{})
 		}
 		if lvl >= LevelInfo {
-			log.Printf("infer start path=%s model=%s", r.URL.Path, req.Model)
+			if zlog != nil {
+				z := zlog.Info().Str("path", r.URL.Path).Str("model", req.Model)
+				if rid := middleware.GetReqID(r.Context()); rid != "" { z = z.Str("request_id", rid) }
+				z.Msg("infer start")
+			} else {
+				log.Printf("infer start path=%s model=%s", r.URL.Path, req.Model)
+			}
 		}
 		// Join server base context with request context so shutdown cancels work too.
 		joinedCtx, cancel := joinContexts(serverBaseCtx, r.Context())
@@ -211,24 +247,64 @@ func NewMux(svc Service) http.Handler {
 			// Map well-known manager errors to HTTP status codes
 			if manager.IsModelNotFound(err) {
 				writeJSONError(w, http.StatusNotFound, err.Error())
-				if lvl >= LevelInfo { log.Printf("infer end status=404 dur=%s err=%v", time.Since(start), err) }
+				if lvl >= LevelInfo {
+					if zlog != nil {
+						z := zlog.Info().Str("status", "404").Dur("dur", time.Since(start))
+						if rid := middleware.GetReqID(r.Context()); rid != "" { z = z.Str("request_id", rid) }
+						z.Err(err).Msg("infer end")
+					} else {
+						log.Printf("infer end status=404 dur=%s err=%v", time.Since(start), err)
+					}
+				}
 				return
 			}
 			if manager.IsTooBusy(err) {
 				writeJSONError(w, http.StatusTooManyRequests, err.Error())
-				if lvl >= LevelInfo { log.Printf("infer end status=429 dur=%s err=%v", time.Since(start), err) }
+				if lvl >= LevelInfo {
+					if zlog != nil {
+						z := zlog.Info().Str("status", "429").Dur("dur", time.Since(start))
+						if rid := middleware.GetReqID(r.Context()); rid != "" { z = z.Str("request_id", rid) }
+						z.Err(err).Msg("infer end")
+					} else {
+						log.Printf("infer end status=429 dur=%s err=%v", time.Since(start), err)
+					}
+				}
 				return
 			}
 			if he, ok := err.(HTTPError); ok {
 				writeJSONError(w, he.StatusCode(), he.Error())
-				if lvl >= LevelInfo { log.Printf("infer end status=%d dur=%s err=%v", he.StatusCode(), time.Since(start), err) }
+				if lvl >= LevelInfo {
+					if zlog != nil {
+						z := zlog.Info().Int("status", he.StatusCode()).Dur("dur", time.Since(start))
+						if rid := middleware.GetReqID(r.Context()); rid != "" { z = z.Str("request_id", rid) }
+						z.Err(err).Msg("infer end")
+					} else {
+						log.Printf("infer end status=%d dur=%s err=%v", he.StatusCode(), time.Since(start), err)
+					}
+				}
 				return
 			}
 			writeJSONError(w, http.StatusInternalServerError, err.Error())
-			if lvl >= LevelInfo { log.Printf("infer end status=500 dur=%s err=%v", time.Since(start), err) }
+			if lvl >= LevelInfo {
+				if zlog != nil {
+					z := zlog.Info().Str("status", "500").Dur("dur", time.Since(start))
+					if rid := middleware.GetReqID(r.Context()); rid != "" { z = z.Str("request_id", rid) }
+					z.Err(err).Msg("infer end")
+				} else {
+					log.Printf("infer end status=500 dur=%s err=%v", time.Since(start), err)
+				}
+			}
 			return
 		}
-		if lvl >= LevelInfo { log.Printf("infer end status=200 dur=%s", time.Since(start)) }
+		if lvl >= LevelInfo {
+			if zlog != nil {
+				z := zlog.Info().Str("status", "200").Dur("dur", time.Since(start))
+				if rid := middleware.GetReqID(r.Context()); rid != "" { z = z.Str("request_id", rid) }
+				z.Msg("infer end")
+			} else {
+				log.Printf("infer end status=200 dur=%s", time.Since(start))
+			}
+		}
 	})
 
 	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
@@ -245,6 +321,9 @@ func NewMux(svc Service) http.Handler {
 		w.WriteHeader(http.StatusServiceUnavailable)
 		w.Write([]byte("loading"))
 	})
+
+	// Prometheus metrics endpoint
+	r.Get("/metrics", promhttp.Handler().ServeHTTP)
 
 	return r
 }

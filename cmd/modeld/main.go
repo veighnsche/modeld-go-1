@@ -16,6 +16,8 @@ import (
 	"modeld/internal/config"
 	"modeld/internal/registry"
 	"modeld/internal/manager"
+
+	"github.com/rs/zerolog"
 )
 
 func main() {
@@ -31,6 +33,8 @@ func main() {
 	vramMarginMB := flag.Int("vram-margin-mb", 0, "Reserved VRAM margin in MB to keep free")
 	defaultModel := flag.String("default-model", "", "Default model id when request omits model")
 	shutdownTimeout := flag.Duration("shutdown-timeout", 5*time.Second, "Graceful shutdown timeout (e.g., 5s, 30s)")
+	maxBodyBytes := flag.Int64("max-body-bytes", 1<<20, "Maximum request body size in bytes for JSON endpoints (default 1MiB)")
+	logLevel := flag.String("log-level", os.Getenv("MODELD_LOG_LEVEL"), "Log level: off|error|info|debug (default from MODELD_LOG_LEVEL)")
 	flag.Parse()
 
 	// Determine which flags were explicitly set to give CLI precedence over config file
@@ -74,6 +78,25 @@ func main() {
 	baseCtx, baseCancel := context.WithCancel(context.Background())
 	defer baseCancel()
 	httpapi.SetBaseContext(baseCtx)
+
+    // Configure structured logging
+    // Set global level based on flag/env
+    switch strings.ToLower(strings.TrimSpace(*logLevel)) {
+    case "off", "":
+        zerolog.SetGlobalLevel(zerolog.Disabled)
+    case "error":
+        zerolog.SetGlobalLevel(zerolog.ErrorLevel)
+    case "debug":
+        zerolog.SetGlobalLevel(zerolog.DebugLevel)
+    default:
+        zerolog.SetGlobalLevel(zerolog.InfoLevel)
+    }
+    // Use console writer for human-friendly dev logs; can be swapped for JSON
+    cw := zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339}
+    logger := zerolog.New(cw).With().Timestamp().Str("service", "modeld").Logger()
+    httpapi.SetLogger(logger)
+    // Apply max body bytes setting
+    httpapi.SetMaxBodyBytes(*maxBodyBytes)
 	mux := httpapi.NewMux(mgr) // registers /models, /status, /switch, /events, /healthz (stubs)
 	srv := &http.Server{
 		Addr:              *addr,
