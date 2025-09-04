@@ -85,6 +85,7 @@ func TestInferStreams(t *testing.T) {
 	r := NewMux(svc)
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/infer", bytes.NewBufferString(`{"prompt":"hi"}`))
+	req.Header.Set("Content-Type", "application/json")
 	r.ServeHTTP(w, req)
 	if w.Code != http.StatusOK { t.Fatalf("status=%d body=%s", w.Code, w.Body.String()) }
 	lines := strings.Split(strings.TrimSpace(w.Body.String()), "\n")
@@ -96,6 +97,7 @@ func TestInferBadJSON(t *testing.T) {
 	r := NewMux(svc)
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/infer", bytes.NewBufferString("not-json"))
+	req.Header.Set("Content-Type", "application/json")
 	r.ServeHTTP(w, req)
 	if w.Code != http.StatusBadRequest { t.Fatalf("status=%d", w.Code) }
 }
@@ -105,6 +107,7 @@ func TestInferHTTPErrorMapping(t *testing.T) {
 	r := NewMux(svc)
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/infer", bytes.NewBufferString(`{"prompt":"hi"}`))
+	req.Header.Set("Content-Type", "application/json")
 	r.ServeHTTP(w, req)
 	if w.Code != http.StatusTooManyRequests { t.Fatalf("status=%d", w.Code) }
 }
@@ -114,8 +117,42 @@ func TestInferGenericErrorMaps500(t *testing.T) {
 	r := NewMux(svc)
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/infer", bytes.NewBufferString(`{"prompt":"hi"}`))
+	req.Header.Set("Content-Type", "application/json")
 	r.ServeHTTP(w, req)
 	if w.Code != http.StatusInternalServerError { t.Fatalf("status=%d", w.Code) }
+}
+
+func TestInferUnsupportedMediaType(t *testing.T) {
+	svc := &mockService{}
+	r := NewMux(svc)
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/infer", bytes.NewBufferString(`{"prompt":"hi"}`))
+	req.Header.Set("Content-Type", "text/plain")
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusUnsupportedMediaType { t.Fatalf("status=%d", w.Code) }
+}
+
+func TestInferBodyTooLarge(t *testing.T) {
+	svc := &mockService{}
+	r := NewMux(svc)
+	w := httptest.NewRecorder()
+	// Create >1MiB body
+	big := make([]byte, (1<<20)+10)
+	for i := range big { big[i] = 'a' }
+	req := httptest.NewRequest(http.MethodPost, "/infer", bytes.NewReader(big))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusBadRequest { t.Fatalf("expected 400 for too-large body, got %d", w.Code) }
+}
+
+func TestInferPromptRequired(t *testing.T) {
+	svc := &mockService{}
+	r := NewMux(svc)
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/infer", bytes.NewBufferString(`{"prompt":"   "}`))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusBadRequest { t.Fatalf("expected 400 for missing prompt, got %d", w.Code) }
 }
 
 func TestHealthz(t *testing.T) {

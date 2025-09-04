@@ -67,6 +67,11 @@ Cancellation behavior:
 - Client disconnects during `POST /infer` will cancel the in-flight generation promptly.
 - Graceful shutdown (SIGINT/SIGTERM) cancels in-flight and queued requests by propagating a base HTTP context through handlers.
 
+Request requirements:
+
+- `POST /infer` requires `Content-Type: application/json`.
+- Request body is limited to ~1MiB for MVP to protect the server. Large prompts should be handled via files or future endpoints.
+
 Example run:
 
 ```bash

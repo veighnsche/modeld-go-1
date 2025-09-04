@@ -9,6 +9,8 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	"path/filepath"
+	"strings"
 
 	"modeld/internal/httpapi"
 	"modeld/internal/config"
@@ -28,6 +30,7 @@ func main() {
 	vramBudgetMB := flag.Int("vram-budget-mb", 0, "VRAM budget in MB for all instances (0=unlimited)")
 	vramMarginMB := flag.Int("vram-margin-mb", 0, "Reserved VRAM margin in MB to keep free")
 	defaultModel := flag.String("default-model", "", "Default model id when request omits model")
+	shutdownTimeout := flag.Duration("shutdown-timeout", 5*time.Second, "Graceful shutdown timeout (e.g., 5s, 30s)")
 	flag.Parse()
 
 	// Determine which flags were explicitly set to give CLI precedence over config file
@@ -47,6 +50,18 @@ func main() {
 		}
 	}
 
+    // Expand home directory in modelsDir if prefixed with ~
+    if strings.HasPrefix(*modelsDir, "~") {
+        if home, err := os.UserHomeDir(); err == nil {
+            // Support cases like ~/models/llm and bare ~
+            if *modelsDir == "~" {
+                *modelsDir = home
+            } else if strings.HasPrefix(*modelsDir, "~/") {
+                *modelsDir = filepath.Join(home, (*modelsDir)[2:])
+            }
+        }
+    }
+
 	// Load registry by scanning modelsDir for *.gguf
 	scanner := registry.NewGGUFScanner()
 	reg, err := scanner.Scan(*modelsDir)
@@ -60,7 +75,14 @@ func main() {
 	defer baseCancel()
 	httpapi.SetBaseContext(baseCtx)
 	mux := httpapi.NewMux(mgr) // registers /models, /status, /switch, /events, /healthz (stubs)
-	srv := &http.Server{Addr: *addr, Handler: mux}
+	srv := &http.Server{
+		Addr:              *addr,
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
 
 	go func() {
 		if *configPath != "" {
@@ -79,7 +101,7 @@ func main() {
 	<-stop
 	// Cancel base context to stop in-flight handler work
 	baseCancel()
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), *shutdownTimeout)
 	defer cancel()
 	if err := srv.Shutdown(ctx); err != nil {
 		log.Printf("graceful shutdown error: %v", err)

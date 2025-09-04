@@ -8,8 +8,10 @@ import (
 	"log"
 	"os"
 	"time"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"modeld/internal/manager"
 	"modeld/pkg/types"
 )
@@ -138,13 +140,16 @@ type HTTPError interface {
 
 func NewMux(svc Service) http.Handler {
 	r := chi.NewRouter()
-	// TODO: add middlewares (request id, recoverer, CORS, gzip) later
+	// Basic middlewares: request id, real ip, recoverer
+	r.Use(middleware.RequestID)
+	r.Use(middleware.RealIP)
+	r.Use(middleware.Recoverer)
 
 	r.Get("/models", func(w http.ResponseWriter, r *http.Request) {
 		// TODO: read from config/registry
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(map[string]any{"models": svc.ListModels()}); err != nil {
-			http.Error(w, "failed to encode response", http.StatusInternalServerError)
+			writeJSONError(w, http.StatusInternalServerError, "failed to encode response")
 			return
 		}
 	})
@@ -152,15 +157,30 @@ func NewMux(svc Service) http.Handler {
 	r.Get("/status", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(svc.Status()); err != nil {
-			http.Error(w, "failed to encode response", http.StatusInternalServerError)
+			writeJSONError(w, http.StatusInternalServerError, "failed to encode response")
 			return
 		}
 	})
 
 	r.Post("/infer", func(w http.ResponseWriter, r *http.Request) {
+		// Content-Type check
+		ct := r.Header.Get("Content-Type")
+		if ct == "" || !strings.HasPrefix(strings.ToLower(ct), "application/json") {
+			writeJSONError(w, http.StatusUnsupportedMediaType, "Content-Type must be application/json")
+			return
+		}
+		// Limit body size to 1MiB for MVP
+		const maxBody = 1 << 20
+		r.Body = http.MaxBytesReader(w, r.Body, maxBody)
 		var req types.InferRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "invalid JSON body", http.StatusBadRequest)
+			// If exceeded size, MaxBytesReader may cause an error; still return 400 to avoid size leak details
+			writeJSONError(w, http.StatusBadRequest, "invalid JSON body")
+			return
+		}
+		// Basic validation
+		if strings.TrimSpace(req.Prompt) == "" {
+			writeJSONError(w, http.StatusBadRequest, "prompt is required")
 			return
 		}
 
@@ -190,34 +210,32 @@ func NewMux(svc Service) http.Handler {
 			}
 			// Map well-known manager errors to HTTP status codes
 			if manager.IsModelNotFound(err) {
-				http.Error(w, err.Error(), http.StatusNotFound)
+				writeJSONError(w, http.StatusNotFound, err.Error())
 				if lvl >= LevelInfo { log.Printf("infer end status=404 dur=%s err=%v", time.Since(start), err) }
 				return
 			}
 			if manager.IsTooBusy(err) {
-				http.Error(w, err.Error(), http.StatusTooManyRequests)
+				writeJSONError(w, http.StatusTooManyRequests, err.Error())
 				if lvl >= LevelInfo { log.Printf("infer end status=429 dur=%s err=%v", time.Since(start), err) }
 				return
 			}
 			if he, ok := err.(HTTPError); ok {
-				http.Error(w, he.Error(), he.StatusCode())
+				writeJSONError(w, he.StatusCode(), he.Error())
 				if lvl >= LevelInfo { log.Printf("infer end status=%d dur=%s err=%v", he.StatusCode(), time.Since(start), err) }
 				return
 			}
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeJSONError(w, http.StatusInternalServerError, err.Error())
 			if lvl >= LevelInfo { log.Printf("infer end status=500 dur=%s err=%v", time.Since(start), err) }
 			return
 		}
 		if lvl >= LevelInfo { log.Printf("infer end status=200 dur=%s", time.Since(start)) }
 	})
 
-	// Liveness probe - process is up
 	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("ok"))
 	})
 
-	// Readiness probe - model loaded and ready to serve
 	r.Get("/readyz", func(w http.ResponseWriter, r *http.Request) {
 		if svc.Ready() {
 			w.WriteHeader(http.StatusOK)
@@ -229,4 +247,14 @@ func NewMux(svc Service) http.Handler {
 	})
 
 	return r
+}
+
+// writeJSONError writes a consistent JSON error payload.
+func writeJSONError(w http.ResponseWriter, status int, msg string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"error": msg,
+		"code":  status,
+	})
 }
