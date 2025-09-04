@@ -13,6 +13,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
 	"modeld/internal/manager"
 	"modeld/pkg/types"
 )
@@ -31,6 +32,8 @@ func NewMux(svc Service) http.Handler {
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
+	// Metrics instrumentation
+	r.Use(MetricsMiddleware)
 	// Compression for JSON endpoints
 	r.Use(middleware.Compress(5))
 	// Security headers
@@ -40,6 +43,16 @@ func NewMux(svc Service) http.Handler {
 			next.ServeHTTP(w, r)
 		})
 	})
+	// Optional CORS
+	if corsEnabled {
+		r.Use(cors.Handler(cors.Options{
+			AllowedOrigins:   corsAllowedOrigins,
+			AllowedMethods:   corsAllowedMethods,
+			AllowedHeaders:   corsAllowedHeaders,
+			AllowCredentials: false,
+			MaxAge:           300,
+		}))
+	}
 
 	r.Get("/models", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -102,6 +115,12 @@ func NewMux(svc Service) http.Handler {
 		}
 		// Join server base context with request context so shutdown cancels work too.
 		joinedCtx, cancel := joinContexts(serverBaseCtx, r.Context())
+		// Apply optional per-handler timeout if configured
+		if inferTimeout > 0 {
+			var tctx context.Context
+			tctx, cancel = context.WithTimeout(joinedCtx, time.Duration(inferTimeout)*time.Second)
+			joinedCtx = tctx
+		}
 		defer cancel()
 		if err := svc.Infer(joinedCtx, req, writer, flush); err != nil {
 			// If context was canceled (client disconnect), just return.
@@ -124,6 +143,7 @@ func NewMux(svc Service) http.Handler {
 			}
 			if manager.IsTooBusy(err) {
 				writeJSONError(w, http.StatusTooManyRequests, err.Error())
+				IncrementBackpressure("queue")
 				if lvl >= LevelInfo {
 					if zlog != nil {
 						z := zlog.Info().Str("status", "429").Dur("dur", time.Since(start))

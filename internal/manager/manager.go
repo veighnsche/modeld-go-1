@@ -27,6 +27,11 @@ type Manager struct {
 	// Queue config
 	maxQueueDepth int
 	maxWait       time.Duration
+
+	// Observability
+	startTime      time.Time
+	loadsTotal     uint64
+	evictionsTotal uint64
 }
 
 func New(reg []types.Model, budgetMB, marginMB int, defaultModel string) *Manager {

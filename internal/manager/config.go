@@ -43,5 +43,6 @@ func NewWithConfig(cfg ManagerConfig) *Manager {
 	} else {
 		m.maxWait = cfg.MaxWait
 	}
+	m.startTime = time.Now()
 	return m
 }
