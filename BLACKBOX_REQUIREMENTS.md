@@ -123,7 +123,13 @@ Note: For in‑process tests, `httptest.NewServer(httpapi.NewMux(manager.New(...
   - Assert: second request receives `status=429`.
 
 - [CLIENT_CANCELLED] If the client cancels the request context mid‑stream, server should stop without producing a 500.
-  - Action: open `/infer` and abort the HTTP request; ensure the server does not respond with 500 (hard to assert externally; can be approximated by ensuring no error logs or by observing connection close behavior).
+  - Action: open `/infer` with streaming enabled, read at least one NDJSON line, then abort the HTTP request by closing the response/connection.
+  - Assert: the server does not produce a `500` for that request and continues to serve subsequent requests (e.g., a fresh `/infer` returns `200` and streams NDJSON).
+  - Implemented in `tests/e2e_py/test_blackbox.py` as `test_blackbox_client_cancellation_mid_stream`.
+
+- [SERVER_SHUTDOWN_CANCELS] On graceful shutdown, in‑flight `/infer` requests are canceled promptly.
+  - Action: start `/infer` (streaming), then send `SIGTERM`/`SIGINT` to the server process.
+  - Assert: server exits cleanly and does not emit `500` responses; any new connections are refused after shutdown begins. (Note: explicit e2e test optional; handler cancellation is wired via a process‑level base context.)
 
 ## Process‑Level E2E Flow (Black‑Box)
 

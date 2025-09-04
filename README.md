@@ -62,6 +62,11 @@ Flags (see `cmd/modeld/main.go`):
 - `--vram-margin-mb` integer VRAM margin to keep free
 - `--default-model` default model id when omitted in requests
 
+Cancellation behavior:
+
+- Client disconnects during `POST /infer` will cancel the in-flight generation promptly.
+- Graceful shutdown (SIGINT/SIGTERM) cancels in-flight and queued requests by propagating a base HTTP context through handlers.
+
 Example run:
 
 ```bash
@@ -243,6 +248,7 @@ Adjust paths to match your environment and ensure your config file and models di
 ## Development
 
 - `scripts/dev-run.sh` runs the server with an example `--config` path. Create that config file or change the script to pass your flags.
+- Black-box tests include a client-cancellation scenario: see `tests/e2e_py/test_blackbox.py::test_blackbox_client_cancellation_mid_stream`.
 - Unit tests for the manager live in `internal/manager/manager_test.go`.
 
 ## Roadmap / Non-Goals (initial)

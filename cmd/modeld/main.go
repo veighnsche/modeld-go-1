@@ -55,6 +55,10 @@ func main() {
 	}
 	mgr := manager.New(reg, *vramBudgetMB, *vramMarginMB, *defaultModel)
 
+	// Set a base context that we will cancel on shutdown to propagate cancellation to handlers.
+	baseCtx, baseCancel := context.WithCancel(context.Background())
+	defer baseCancel()
+	httpapi.SetBaseContext(baseCtx)
 	mux := httpapi.NewMux(mgr) // registers /models, /status, /switch, /events, /healthz (stubs)
 	srv := &http.Server{Addr: *addr, Handler: mux}
 
@@ -73,6 +77,8 @@ func main() {
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 	<-stop
+	// Cancel base context to stop in-flight handler work
+	baseCancel()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(ctx); err != nil {

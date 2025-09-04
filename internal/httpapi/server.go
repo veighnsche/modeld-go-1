@@ -52,6 +52,34 @@ func indexByte(b []byte, c byte) int {
 	return -1
 }
 
+// joinContexts returns a context that is canceled when either a or b is done.
+// The returned cancel func must be called to release the goroutine when handler ends.
+func joinContexts(a, b context.Context) (context.Context, context.CancelFunc) {
+    ctx, cancel := context.WithCancel(context.Background())
+    go func() {
+        select {
+        case <-a.Done():
+            cancel()
+        case <-b.Done():
+            cancel()
+        }
+    }()
+    return ctx, cancel
+}
+
+// serverBaseCtx is a process-level context that can be canceled on shutdown.
+// Defaults to Background if not set.
+var serverBaseCtx = context.Background()
+
+// SetBaseContext sets the process-level base context used by handlers.
+func SetBaseContext(ctx context.Context) {
+    if ctx == nil {
+        serverBaseCtx = context.Background()
+        return
+    }
+    serverBaseCtx = ctx
+}
+
 type LogLevel int
 
 const (
@@ -152,9 +180,12 @@ func NewMux(svc Service) http.Handler {
 		if lvl >= LevelInfo {
 			log.Printf("infer start path=%s model=%s", r.URL.Path, req.Model)
 		}
-		if err := svc.Infer(r.Context(), req, writer, flush); err != nil {
+		// Join server base context with request context so shutdown cancels work too.
+		joinedCtx, cancel := joinContexts(serverBaseCtx, r.Context())
+		defer cancel()
+		if err := svc.Infer(joinedCtx, req, writer, flush); err != nil {
 			// If context was canceled (client disconnect), just return.
-			if r.Context().Err() != nil {
+			if r.Context().Err() != nil || serverBaseCtx.Err() != nil {
 				return
 			}
 			// Map well-known manager errors to HTTP status codes

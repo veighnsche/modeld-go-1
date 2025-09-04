@@ -25,7 +25,10 @@ Build a **control-plane service** (Go 1.22+) that can manage **multiple preloade
   - Maintain **instances**: `model_id -> {state, last_used, est_vram_mb}`.
   - Enforce **VRAM budget** and **margin** (configurable). When loading a new instance would exceed the budget, **evict** least-recently-used idle instances until it fits.
   - Per-instance state machine: `ready → loading → ready|error`.
-  - Cancellation: cancel in-flight generations on instance unload/evict (stub for now).
+  - Cancellation:
+    - Client disconnect mid-stream cancels the in-flight generation (implemented).
+    - Graceful shutdown propagates cancellation to in-flight/queued requests via a base HTTP context (implemented).
+    - Cancel on instance unload/evict remains a stub for now (eviction currently skips active instances).
   - Config: models are discovered from `--models-dir`; hot-reload (directory watch) can be added later.
 
 ## Non-Goals (for later phases)
@@ -48,8 +51,9 @@ Build a **control-plane service** (Go 1.22+) that can manage **multiple preloade
   - Optional global `max-inflight` across all instances to protect CPU/GPU.
   - If global limit reached, return `429` early.
 - Cancellation & client disconnects:
-  - If the client disconnects while queued, remove the request.
-  - If disconnects during streaming, cancel generation promptly.
+  - If the client disconnects while queued, remove the request (implemented via context propagation in admission queue waits).
+  - If disconnects during streaming, cancel generation promptly (implemented; generation loop checks `ctx.Done()`).
+  - During graceful shutdown, all handler contexts are canceled so both queued and in-flight /infer requests terminate promptly (implemented).
 - Fairness:
   - Basic FIFO is sufficient for MVP. No per-tenant fairness or priorities in MVP.
 

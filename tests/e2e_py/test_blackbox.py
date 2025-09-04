@@ -102,6 +102,60 @@ def start_server(models_dir: pathlib.Path, default_model: str | None = None):
             shutil.rmtree(bin_path.parent)
 
 
+@contextlib.contextmanager
+def start_server_with_handle(models_dir: pathlib.Path, default_model: str | None = None):
+    """Start the server and yield (base_url, process).
+
+    This is similar to start_server but also exposes the process handle so tests
+    can send signals (e.g., SIGTERM) to verify graceful shutdown behavior.
+    """
+    bin_path = build_binary()
+    port = find_free_port()
+    addr = f":{port}"
+    args = [str(bin_path), "--addr", addr, "--models-dir", str(models_dir)]
+    if default_model:
+        args += ["--default-model", default_model]
+    env = os.environ.copy()
+    proc = subprocess.Popen(args, cwd=str(ROOT), env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1)
+    t_out = threading.Thread(target=_reader_thread, args=(proc.stdout, 'OUT'), daemon=True)
+    t_err = threading.Thread(target=_reader_thread, args=(proc.stderr, 'ERR'), daemon=True)
+    t_out.start(); t_err.start()
+    base = f"http://127.0.0.1:{port}"
+    deadline = time.time() + 5
+    try:
+        # Wait for healthz
+        while time.time() < deadline:
+            try:
+                r = requests.get(base + "/healthz", timeout=0.5)
+                if r.status_code == 200:
+                    break
+            except Exception:
+                pass
+            time.sleep(0.05)
+        else:
+            raise AssertionError("server did not become healthy in time")
+        yield base, proc
+    finally:
+        with contextlib.suppress(Exception):
+            proc.terminate()
+        try:
+            proc.wait(timeout=3)
+        except Exception:
+            with contextlib.suppress(Exception):
+                proc.kill()
+        # Ensure log threads drained
+        with contextlib.suppress(Exception):
+            if proc.stdout:
+                proc.stdout.close()
+            if proc.stderr:
+                proc.stderr.close()
+            t_out.join(timeout=1)
+            t_err.join(timeout=1)
+        # Clean the built binary directory
+        with contextlib.suppress(Exception):
+            shutil.rmtree(bin_path.parent)
+
+
 def touch_models(names: list[str]) -> Tuple[pathlib.Path, list[str]]:
     d = pathlib.Path(tempfile.mkdtemp(prefix="models-"))
     for n in names:
@@ -320,3 +374,73 @@ def test_happy_models_list_contains_default():
         assert r.status_code == 200
         names = {m.get("id") for m in r.json().get("models", [])}
         assert models[0] in names
+
+
+def test_blackbox_client_cancellation_mid_stream():
+    """Client aborts the /infer stream mid-way; server should not produce 500
+    and should remain operational for subsequent requests.
+    """
+    models_dir, models = touch_models(["alpha.gguf"]) 
+    with start_server(models_dir, default_model=models[0]) as base:
+        # Start a streaming infer request
+        s = requests.Session()
+        r = s.post(base + "/infer", json={"prompt": "will-cancel"}, stream=True)
+        assert r.status_code == 200
+        it = r.iter_lines(decode_unicode=True)
+        # Read the first line to ensure stream started
+        first = next(it, None)
+        assert first is not None
+        # Abort the request mid-stream
+        r.close()
+        s.close()
+        # Small delay to allow server handler to observe cancellation
+        time.sleep(0.05)
+        # Server should still serve new requests successfully (no 500)
+        r2 = requests.post(base + "/infer", json={"prompt": "after-cancel"})
+        assert r2.status_code == 200
+        assert "\n" in r2.text
+
+
+def test_blackbox_shutdown_cancels_inflight():
+    """Graceful shutdown should cancel in-flight /infer requests and exit cleanly.
+
+    Procedure:
+    - Start server and begin a streaming /infer
+    - Read one line to ensure streaming has begun
+    - Send SIGTERM to the server process
+    - Assert the process exits soon and the stream ends without a server 500
+    - Subsequent connection attempts should fail due to shutdown
+    """
+    models_dir, models = touch_models(["alpha.gguf"]) 
+    with start_server_with_handle(models_dir, default_model=models[0]) as (base, proc):
+        s = requests.Session()
+        r = s.post(base + "/infer", json={"prompt": "shutdown-cancel"}, stream=True)
+        assert r.status_code == 200
+        it = r.iter_lines(decode_unicode=True)
+        # ensure streaming began
+        first = next(it, None)
+        assert first is not None
+        # trigger graceful shutdown
+        with contextlib.suppress(Exception):
+            proc.terminate()
+        # process should exit promptly
+        try:
+            proc.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            raise AssertionError("server did not exit promptly on SIGTERM")
+        # the stream should end after shutdown; reading further should stop/raise
+        with contextlib.suppress(Exception):
+            _ = next(it, None)
+        # server should no longer accept connections
+        with contextlib.suppress(Exception):
+            # small delay to ensure port release
+            time.sleep(0.05)
+        failed = False
+        try:
+            _ = requests.get(base + "/healthz", timeout=0.5)
+        except Exception:
+            failed = True
+        assert failed, "healthz should not be reachable after shutdown"
+        # cleanup client
+        with contextlib.suppress(Exception):
+            r.close(); s.close()
