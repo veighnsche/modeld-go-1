@@ -6,12 +6,10 @@ import (
 	"context"
 	"io"
 	"log"
-	"os"
 	"time"
 	"strings"
 	
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/rs/zerolog"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -25,139 +23,6 @@ type Service interface {
 	Status() types.StatusResponse
 	Infer(ctx context.Context, req types.InferRequest, w io.Writer, flush func()) error
 	Ready() bool
-}
-
-// loggingLineWriter logs complete NDJSON lines to the standard logger.
-type loggingLineWriter struct {
-	buf []byte
-}
-
-func (lw *loggingLineWriter) Write(p []byte) (int, error) {
-	lw.buf = append(lw.buf, p...)
-	for {
-		idx := indexByte(lw.buf, '\n')
-		if idx < 0 {
-			break
-		}
-		line := string(lw.buf[:idx])
-		if len(line) > 0 {
-			log.Printf("infer> %s", line)
-		}
-		lw.buf = lw.buf[idx+1:]
-	}
-	return len(p), nil
-}
-
-func indexByte(b []byte, c byte) int {
-	for i := range b {
-		if b[i] == c {
-			return i
-		}
-	}
-	return -1
-}
-
-// joinContexts returns a context that is canceled when either a or b is done.
-// The returned cancel func must be called to release the goroutine when handler ends.
-func joinContexts(a, b context.Context) (context.Context, context.CancelFunc) {
-    ctx, cancel := context.WithCancel(context.Background())
-    go func() {
-        select {
-        case <-a.Done():
-            cancel()
-        case <-b.Done():
-            cancel()
-        }
-    }()
-    return ctx, cancel
-}
-
-// serverBaseCtx is a process-level context that can be canceled on shutdown.
-// Defaults to Background if not set.
-var serverBaseCtx = context.Background()
-
-// SetBaseContext sets the process-level base context used by handlers.
-func SetBaseContext(ctx context.Context) {
-    if ctx == nil {
-        serverBaseCtx = context.Background()
-        return
-    }
-    serverBaseCtx = ctx
-}
-
-// maxBodyBytes controls the maximum allowed request body size for JSON endpoints.
-// Default remains 1 MiB for backward compatibility.
-var maxBodyBytes int64 = 1 << 20
-
-// SetMaxBodyBytes allows configuring the maximum request body size.
-func SetMaxBodyBytes(n int64) {
-    if n <= 0 {
-        maxBodyBytes = 1 << 20
-        return
-    }
-    maxBodyBytes = n
-}
-
-// zlog is an optional structured logger. If unset, falls back to log.Printf.
-var zlog *zerolog.Logger
-
-// SetLogger installs a structured logger used by the HTTP layer.
-func SetLogger(l zerolog.Logger) { zlog = &l }
-
-type LogLevel int
-
-const (
-	LevelOff LogLevel = iota
-	LevelError
-	LevelInfo
-	LevelDebug
-)
-
-func parseLevel(s string) LogLevel {
-	switch s {
-	case "off", "":
-		return LevelOff
-	case "error":
-		return LevelError
-	case "info":
-		return LevelInfo
-	case "debug":
-		return LevelDebug
-	default:
-		return LevelInfo
-	}
-}
-
-// global default, read once
-var defaultLogLevel = func() LogLevel {
-	// legacy switch for compatibility
-	if os.Getenv("MODELD_LOG_INFER") == "1" {
-		return LevelDebug
-	}
-	return parseLevel(os.Getenv("MODELD_LOG_LEVEL"))
-}()
-
-func requestLogLevel(r *http.Request) LogLevel {
-	// Per-request overrides
-	if v := r.URL.Query().Get("log"); v != "" {
-		if v == "1" {
-			return LevelDebug
-		}
-		return parseLevel(v)
-	}
-	if v := r.Header.Get("X-Log-Level"); v != "" {
-		return parseLevel(v)
-	}
-	if r.Header.Get("X-Log-Infer") == "1" { // legacy
-		return LevelDebug
-	}
-	return defaultLogLevel
-}
-
-// HTTPError allows services to provide an HTTP status code for an error.
-type HTTPError interface {
-	error
-	StatusCode() int
 }
 
 func NewMux(svc Service) http.Handler {
@@ -328,12 +193,4 @@ func NewMux(svc Service) http.Handler {
 	return r
 }
 
-// writeJSONError writes a consistent JSON error payload.
-func writeJSONError(w http.ResponseWriter, status int, msg string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(map[string]any{
-		"error": msg,
-		"code":  status,
-	})
-}
+// writeJSONError is implemented in errors.go
