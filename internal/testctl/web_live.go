@@ -10,12 +10,12 @@ import (
 	"time"
 )
 
-// testWebLiveHost runs the full UI suite against a live backend using host models.
+// testWebLiveHost runs the full UI suite against the backend using host models.
 func testWebLiveHost(cfg *Config) error {
 	if !hasHostModels() {
-		return errors.New("host models not found in $HOME/models/llm; cannot run live:host")
+		return errors.New("host models not found in $HOME/models/llm; cannot run host UI tests")
 	}
-	info("==== Run Cypress (Live:Host) ====")
+	info("==== Run Cypress (Host) ====")
 	// determine API port (prefer 18080, else free)
 	apiPort, err := preferOrFree(18080)
 	if err != nil {

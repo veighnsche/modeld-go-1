@@ -55,7 +55,6 @@ go build -tags=llama ./cmd/modeld
 mgr := manager.NewWithConfig(manager.ManagerConfig{
     Registry: []types.Model{{ID: "tinyllama-q4", Path: "/path/to/model.gguf"}},
     DefaultModel:     "tinyllama-q4",
-    RealInferEnabled: true, // enables in‑process inference via go‑llama.cpp
     LlamaCtx:         4096,
     LlamaThreads:     8,
 })
@@ -210,7 +209,7 @@ Design goals:
 ## FAQ
 
 - __How do I enable in‑process llama?__
-  Build with `-tags=llama` and set `RealInferEnabled: true` in `manager.ManagerConfig`. Also set `LlamaCtx` and `LlamaThreads` as needed.
+  Build with `-tags=llama`. Configure `LlamaCtx` and `LlamaThreads` as needed in `manager.ManagerConfig`.
 
 - __I get "cannot find -lllama" or runtime loader errors about `libllama.so`. What do I do?__
   Ensure the native llama library is available to the dynamic loader. Easiest is to place `libllama.so` next to your built binary; `internal/manager/llama_cgo.go` sets rpath `$ORIGIN` so the loader finds it there. Alternatively, install it in a system library path.
@@ -219,7 +218,7 @@ Design goals:
   No. External server mode was removed. All inference is handled in‑process via `go-skynet/go-llama.cpp`.
 
 - __Builds succeed but inference returns a dependency error.__
-  Make sure you built with `-tags=llama` and initialized the manager with `RealInferEnabled: true`. Without the tag, the stub adapter is used (no CGO) and inference is disabled.
+  Make sure you built with `-tags=llama`. Without the tag, the stub adapter is used (no CGO) and inference is unavailable.
 
 - __How do I configure the default model?__
   Provide your registry via `manager.ManagerConfig.Registry` and set `DefaultModel` to the desired model ID. The `Path` field must point to a valid `.gguf` file.

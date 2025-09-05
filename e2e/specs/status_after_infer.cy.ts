@@ -3,7 +3,6 @@
 describe('Status after infer', () => {
   it('validates /status JSON after a successful infer (best-effort)', () => {
     const statusUrl = Cypress.env('API_STATUS_URL')
-    const mockMode = Boolean(Cypress.env('USE_MOCKS'))
 
     // Trigger an infer via the UI
     cy.visit('/')
@@ -11,9 +10,9 @@ describe('Status after infer', () => {
     cy.get('[data-testid="submit-btn"]').click()
     cy.get('[data-testid="status"]').should('have.text', 'success')
 
-    // If API_STATUS_URL is provided and we're not in mock mode, assert JSON shape
-    if (!statusUrl || mockMode) {
-      cy.log('Skipping /status validation (no API_STATUS_URL or mock mode)')
+    // If API_STATUS_URL is provided, assert JSON shape
+    if (!statusUrl) {
+      cy.log('Skipping /status validation (no API_STATUS_URL)')
       return
     }
 

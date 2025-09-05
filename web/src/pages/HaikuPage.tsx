@@ -1,11 +1,10 @@
 import { useRef, useState } from 'react'
-import { fullUrl, PATHS, SEND_STREAM_FIELD, USE_MOCKS } from '../env'
+import { fullUrl, PATHS, SEND_STREAM_FIELD } from '../env'
 
 export default function HaikuPage() {
   const [status, setStatus] = useState<'idle'|'requesting'|'success'|'error'>('idle')
   const [poem, setPoem] = useState('')
   const abortRef = useRef<AbortController | null>(null)
-  const mode = USE_MOCKS ? 'mock' : 'live'
 
   async function generate() {
     setStatus('requesting')
@@ -15,15 +14,6 @@ export default function HaikuPage() {
     abortRef.current = ac
 
     const prompt = 'Write a 3-line haiku about the ocean.'
-
-    if (USE_MOCKS) {
-      // Minimal mock fallback for layout; content replaced in live mode.
-      setTimeout(() => {
-        setPoem('Ocean whispers blue\nWaves teach rocks the art of time\nSalt stars fade at dawn')
-        setStatus('success')
-      }, 300)
-      return
-    }
 
     try {
       const body: any = { prompt }
@@ -151,9 +141,7 @@ export default function HaikuPage() {
             {status==='requesting' ? 'Generating…' : 'Generate Haiku'}
           </button>
         </div>
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
-          <small data-testid="mode">{mode}</small>
-        </div>
+        {/* Mode indicator removed: always live */}
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
           <small data-testid="haiku-status">{status}</small>
         </div>

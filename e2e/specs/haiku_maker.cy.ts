@@ -2,23 +2,12 @@
 
 // DO NOT MOCK THE HAIKU FOR TESTING!!!
 // This spec intentionally drives the live UI and hits the real backend.
-// If the test environment is configured for mocks, we will skip the test entirely.
 // DO NOT MOCK THE HAIKU FOR TESTING!!!
 
 describe('Haiku Maker - live web harness', () => {
-  const isMock = Boolean(Cypress.env('USE_MOCKS'))
   const STATUS_URL = Cypress.env('API_STATUS_URL') as string | undefined
   const READY_URL = Cypress.env('API_READY_URL') as string | undefined
   const MODELS_URL = (STATUS_URL ? STATUS_URL.replace(/\/?status$/i, '/models') : undefined) as string | undefined
-
-  // DO NOT MOCK THE HAIKU FOR TESTING!!!
-  if (isMock) {
-    it('skips in mock mode - DO NOT MOCK THE HAIKU FOR TESTING!!!', () => {
-      cy.log('Skipping haiku live test because USE_MOCKS is true')
-      cy.log('DO NOT MOCK THE HAIKU FOR TESTING!!!')
-    })
-    return
-  }
 
   it('generates a real haiku via the UI against the live backend', () => {
     // 1) Best-effort ready check. DO NOT MOCK THE HAIKU FOR TESTING!!!
@@ -45,7 +34,6 @@ describe('Haiku Maker - live web harness', () => {
 
     // 3) Drive the UI. DO NOT MOCK THE HAIKU FOR TESTING!!!
     cy.visit('/')
-    cy.get('[data-testid="mode"]').should('have.text', 'live')
 
     // Use a real prompt that asks for a haiku; do not assert exact text, only presence of output.
     const prompt = 'Write a haiku about the ocean in English.'

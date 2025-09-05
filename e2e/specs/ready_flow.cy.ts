@@ -3,9 +3,8 @@
 describe('Ready flow', () => {
   it('readyz transitions after first infer (best-effort)', () => {
     const readyUrl = Cypress.env('API_READY_URL')
-    const mockMode = Boolean(Cypress.env('USE_MOCKS'))
-    if (!readyUrl || mockMode) {
-      cy.log('Skipping readyz check (no API_READY_URL or mock mode)')
+    if (!readyUrl) {
+      cy.log('Skipping readyz check (no API_READY_URL)')
       return
     }
 

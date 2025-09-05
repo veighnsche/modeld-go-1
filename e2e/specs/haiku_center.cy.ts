@@ -4,19 +4,8 @@
 // This spec drives the new Haiku page and verifies the poem appears centered on screen.
 
 describe('Haiku Page - centered poem (live)', () => {
-  const isMock = Boolean(Cypress.env('USE_MOCKS'))
-  if (isMock) {
-    it('skips in mock mode - DO NOT MOCK THE HAIKU FOR TESTING!!!', () => {
-      cy.log('Skipping haiku live test because USE_MOCKS is true')
-    })
-    return
-  }
-
   it('renders a haiku in the middle of the screen', () => {
     cy.visit('/haiku')
-
-    // Ensure we are in live mode
-    cy.get('[data-testid="mode"]').should('have.text', 'live')
 
     // Trigger generation
     cy.get('[data-testid="make-haiku-btn"]').click()

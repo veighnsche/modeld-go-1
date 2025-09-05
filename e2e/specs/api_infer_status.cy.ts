@@ -1,21 +1,12 @@
 /// <reference types="cypress" />
 
-// Live-only Cypress spec that runs against a real API and real local models.
-// It will be automatically skipped when USE_MOCKS is enabled.
+// Cypress spec that runs against the API and host models.
 
-describe('Live API - real infer + status', () => {
-  const isMock = Boolean(Cypress.env('USE_MOCKS'))
+describe('API - infer + status', () => {
   const STATUS_URL = Cypress.env('API_STATUS_URL') as string | undefined
   const READY_URL = Cypress.env('API_READY_URL') as string | undefined
   // Derive MODELS_URL from STATUS_URL if not explicitly provided
   const MODELS_URL = (STATUS_URL ? STATUS_URL.replace(/\/?status$/i, '/models') : undefined) as string | undefined
-
-  if (isMock) {
-    it('skips in mock mode', () => {
-      cy.log('Skipping live test because USE_MOCKS is true')
-    })
-    return
-  }
 
   it('performs an infer via the UI and validates /status', () => {
     // 1) Ready check (best-effort)
@@ -45,7 +36,6 @@ describe('Live API - real infer + status', () => {
 
     // 3) Drive the UI
     cy.visit('/')
-    cy.get('[data-testid="mode"]').should('have.text', 'live')
     cy.get('[data-testid="prompt-input"]').clear().type('What is 2 + 2?')
     if (MODELS_URL) {
       cy.get<string>('@chosenModel').then((m) => {

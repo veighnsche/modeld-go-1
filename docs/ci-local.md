@@ -100,9 +100,10 @@ bin/testctl test go
 ```
 bin/testctl test api:py
 ```
-- Run web UI E2E (auto decide mock vs live:host):
+- Run web UI E2E (auto chooses host models when available):
 ```
 bin/testctl test web auto
+# Note: requires host models in ~/models/llm; otherwise errors
 ```
 - Install helpers (Docker / act / language toolchains):
 ```

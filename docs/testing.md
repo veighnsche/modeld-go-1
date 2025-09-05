@@ -69,10 +69,9 @@ A thin CLI that installs tools and runs tests across Go, Python, and Cypress.
   ```bash
   bin/testctl test go
   bin/testctl test api:py
-  bin/testctl test web mock
-  bin/testctl test web live:host
+  bin/testctl test web host
   bin/testctl test web auto
   bin/testctl test all auto
   ```
 
-The UI suite enforces a strict rule: if host models exist in `~/models/llm`, `test web auto` runs against the live API; otherwise it runs in mock mode.
+The UI suite enforces a strict rule: UI tests require host models in `~/models/llm`. The `test web auto` command will run against the API when host models exist; otherwise it will error.

@@ -11,13 +11,13 @@ import (
 )
 
 // DO NOT MOCK THE HAIKU FOR TESTING!!!
-// testWebHaikuHost starts a local API with host models, serves the web app without mocks,
-// and runs only the Haiku Cypress spec against the live backend.
+// testWebHaikuHost starts a local API with host models, serves the web app,
+// and runs only the Haiku Cypress spec against the backend.
 func testWebHaikuHost(cfg *Config) error {
 	if !hasHostModels() {
-		return errors.New("host models not found in $HOME/models/llm; cannot run haiku live test")
+		return errors.New("host models not found in $HOME/models/llm; cannot run haiku test")
 	}
-	info("==== Run Cypress (Haiku Live:Host) ====")
+	info("==== Run Cypress (Haiku Host) ====")
 	// determine API port (prefer 18080, else free)
 	apiPort, err := preferOrFree(18080)
 	if err != nil {
@@ -30,7 +30,7 @@ func testWebHaikuHost(cfg *Config) error {
 	}
 	defer func() { _ = killProcesses() }()
 
-	// Start server with host models and enable real inference
+	// Start server with host models (inference is enabled by default)
 	modelsDir := filepath.Join(homeDir(), "models", "llm")
 	defaultModel, err := firstGGUF(modelsDir)
 	if err != nil {
@@ -40,7 +40,7 @@ func testWebHaikuHost(cfg *Config) error {
 	defer srvCancel()
 	llamaBin := findLlamaBin()
 	srv := exec.CommandContext(srvCtx, "bash", "-lc", fmt.Sprintf(
-		"go run ./cmd/modeld --addr :%d --models-dir '%s' --default-model '%s' --cors-enabled --cors-origins '*' --real-infer --llama-bin '%s'",
+		"go run ./cmd/modeld --addr :%d --models-dir '%s' --default-model '%s' --cors-enabled --cors-origins '*' --llama-bin '%s'",
 		apiPort, modelsDir, defaultModel, llamaBin,
 	))
 	srv.Stdout = os.Stdout

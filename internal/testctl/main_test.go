@@ -34,7 +34,7 @@ func TestMainWithArgs_TestGo_SuccessExit0(t *testing.T) {
 
 func TestMainWithArgs_FlagsAreParsedAndPassedToHandlers(t *testing.T) {
 	cleanup := withCLIStubs(t, func() {
-		fnTestWebMock = func(c *Config) error {
+		fnTestWebLiveHost = func(c *Config) error {
 			if c.WebPort != 4242 {
 				t.Fatalf("expected cfg.WebPort 4242 from flags, got %d", c.WebPort)
 			}
@@ -46,10 +46,10 @@ func TestMainWithArgs_FlagsAreParsedAndPassedToHandlers(t *testing.T) {
 	})
 	defer cleanup()
 
-	args := []string{"--web-port", "4242", "--log-level", "debug", "test", "web", "mock"}
+	args := []string{"--web-port", "4242", "--log-level", "debug", "test", "web", "host"}
 	code := MainWithArgs(args)
 	if code != 0 {
-		t.Fatalf("expected exit code 0 for web mock with flags, got %d", code)
+		t.Fatalf("expected exit code 0 for web host with flags, got %d", code)
 	}
 }
 

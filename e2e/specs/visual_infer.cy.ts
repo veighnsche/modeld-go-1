@@ -1,21 +1,10 @@
 /// <reference types="cypress" />
 
-function getEnvBool(name: string, def = false) {
-  const v = Cypress.env(name)
-  if (v == null) return def
-  if (typeof v === 'boolean') return v
-  return /^(1|true|yes|on)$/i.test(String(v))
-}
-
 describe('Visual Harness Infer Flow', () => {
   it('streams and completes', () => {
-    const mockMode = getEnvBool('USE_MOCKS', false)
     cy.visit('/')
-
-    if (!mockMode) {
-      const healthUrl = Cypress.env('API_HEALTH_URL') || `${Cypress.config('baseUrl')}/healthz`
-      cy.healthCheck(healthUrl, 60000)
-    }
+    const healthUrl = Cypress.env('API_HEALTH_URL') || `${Cypress.config('baseUrl')}/healthz`
+    cy.healthCheck(healthUrl, 60000)
 
     // Type prompt and optional model
     cy.get('[data-testid="prompt-input"]').clear().type('Hello')

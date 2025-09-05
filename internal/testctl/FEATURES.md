@@ -26,7 +26,7 @@ It focuses on what you can do, with concise pointers to implementation files.
   - go — [Go Test] (+ includes [Go E2E])
   - api:py — [Py E2E]
   - py:haiku — [Py E2E]
-  - web <mock|live:host|haiku|auto> — [Cypress]
+  - web <host|haiku|auto> — [Cypress]
   - all auto — [Orchestration] (Go → Py → Web)
 - test ci
   - all [runner:catthehacker|runner:default] [-- <extra act args>] — [CI]
@@ -144,29 +144,27 @@ Focus: exercising the HTTP API from Python.
 - Runner: `internal/testctl/tests.go`
 - Tests: `tests/e2e_py/`
 
-## Cypress E2E Testing
+## Cypress E2E Testing (Live-only)
 
 Focus: UI end-to-end testing. Web commands are Cypress-only and not a general dev/prod server.
 
 - Install (JS deps) — `install nodejs` (ensures pnpm; installs root and `web/` with frozen lockfiles) (`install_nodejs.go`)
-- Run — `test web <mock|live:host|haiku|auto>`
-  - mock: builds with mocks, previews, runs Cypress (`web_mock.go`)
-  - live:host: requires host `*.gguf` models; starts API; runs Cypress (`web_live.go`)
-  - haiku: live host + real infer; runs haiku spec only (`web_haiku.go`)
-- Env vars: `VITE_USE_MOCKS`, `VITE_API_BASE_URL`, `VITE_SEND_STREAM_FIELD`, `CYPRESS_BASE_URL`, `CYPRESS_USE_MOCKS`, `CYPRESS_API_READY_URL`, `CYPRESS_API_STATUS_URL`
+- Run — `test web <host|haiku|auto>`
+  - host: requires host `*.gguf` models; starts API; runs Cypress (`web_live.go`)
+  - haiku: host; runs haiku spec only (`web_haiku.go`)
+  - auto: runs `host` when host models exist; otherwise errors (no mock fallback)
+  - Env vars: `VITE_API_BASE_URL`, `VITE_SEND_STREAM_FIELD`, `CYPRESS_BASE_URL`, `CYPRESS_API_READY_URL`, `CYPRESS_API_STATUS_URL`
 
 ### CLI: commands & options
 
 - `install nodejs`
   - Ensures `pnpm` via `corepack`; installs root and `web/` deps with `--frozen-lockfile`.
-- `test web mock`
-  - Builds with mocks; starts preview; runs Cypress against preview.
-- `test web live:host`
-  - Requires host `*.gguf` models; starts local API; builds without mocks; runs Cypress.
+- `test web host`
+  - Requires host `*.gguf` models; starts local API; builds UI; runs Cypress.
 - `test web haiku`
   - Like `live:host` but runs only the haiku spec with real infer.
 - `test web auto`
-  - Chooses `live:host` if host models exist, else `mock`.
+  - Chooses `host` if host models exist; otherwise errors.
 - Options
   - `--web-port <port>` (defaults to `WEB_PORT` or `5173`) — used for the Vite preview.
 
@@ -174,7 +172,7 @@ Focus: UI end-to-end testing. Web commands are Cypress-only and not a general de
 
 - Installer: `internal/testctl/install_nodejs.go`
 - Web helpers: `internal/testctl/web_helpers.go`
-- Modes: `internal/testctl/web_mock.go`, `internal/testctl/web_live.go`, `internal/testctl/web_haiku.go`
+- Modes: `internal/testctl/web_live.go`, `internal/testctl/web_haiku.go`
 
 ## CI Testing
 

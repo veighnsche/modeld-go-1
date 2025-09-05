@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { fullUrl, PATHS, SEND_STREAM_FIELD, USE_MOCKS } from '../env'
+import { fullUrl, PATHS, SEND_STREAM_FIELD } from '../env'
 
 export default function InferPage() {
   const [prompt, setPrompt] = useState('')
@@ -11,17 +11,10 @@ export default function InferPage() {
   const [modelsCount, setModelsCount] = useState<number | null>(null)
   const abortRef = useRef<AbortController | null>(null)
 
-  const mode = USE_MOCKS ? 'mock' : 'live'
-
   useEffect(() => {
     let didCancel = false
     ;(async () => {
       try {
-        if (USE_MOCKS) {
-          // In mock mode, surface a stable models count for the UI/tests.
-          if (!didCancel) setModelsCount(1)
-          return
-        }
         const res = await fetch(fullUrl(PATHS.models))
         if (!res.ok) throw new Error(`models ${res.status}`)
         const data = await res.json()
@@ -35,30 +28,6 @@ export default function InferPage() {
     })()
     return () => { didCancel = true }
   }, [])
-
-  async function runMock() {
-    setStatus('requesting')
-    setStreamLog([])
-    setResultJson('')
-    setLatencyMs(null)
-    const started = performance.now()
-
-    const lines = [
-      JSON.stringify({ type: 'token', content: 'Hello' }),
-      JSON.stringify({ type: 'token', content: ' world' }),
-      JSON.stringify({ done: true, message: 'mock-complete' })
-    ]
-
-    for (const line of lines) {
-      await new Promise(r => setTimeout(r, 50))
-      setStreamLog(prev => [...prev, line])
-    }
-
-    const finalObj = { ok: true, done: true, mode: 'mock', echo: { prompt, model: model || undefined } }
-    setResultJson(JSON.stringify(finalObj, null, 2))
-    setLatencyMs(Math.round(performance.now() - started))
-    setStatus('success')
-  }
 
   async function runLive() {
     setStatus('requesting')
@@ -138,8 +107,7 @@ export default function InferPage() {
   }
 
   const onSend = () => {
-    if (USE_MOCKS) runMock()
-    else runLive()
+    runLive()
   }
 
   const modelsCountView = useMemo(() => {
@@ -151,7 +119,6 @@ export default function InferPage() {
 
   return (
     <div style={{ padding: 12, fontFamily: 'ui-sans-serif, system-ui, sans-serif' }}>
-      <div data-testid="mode">{mode}</div>
       {modelsCountView}
       <div style={{ display: 'grid', gap: 8, maxWidth: 800 }}>
         <textarea data-testid="prompt-input" value={prompt} onChange={e => setPrompt(e.target.value)} rows={5} />

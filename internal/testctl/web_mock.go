@@ -6,19 +6,17 @@ import (
 	"time"
 )
 
-// UI suites
+// UI suites (live-only preview)
 func testWebMock(cfg *Config) error {
-	info("==== Run Cypress (Mock) ====")
+	info("==== Run Cypress (Live UI Preview) ====")
 	// pick a port: prefer cfg.WebPort, but if busy choose a free one
 	webPort, err := preferOrFree(cfg.WebPort)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = killProcesses() }()
-	// Build and preview with mocks
-	if err := buildWebWith(map[string]string{
-		"VITE_USE_MOCKS": "1",
-	}); err != nil {
+	// Build and preview (live-only UI harness)
+	if err := buildWebWith(nil); err != nil {
 		return err
 	}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -34,7 +32,5 @@ func testWebMock(cfg *Config) error {
 	// Run cypress with dynamic baseUrl
 	return runCypress(map[string]string{
 		"CYPRESS_BASE_URL": fmt.Sprintf("http://localhost:%d", webPort),
-		// Signal to Cypress specs that we are running with mocks enabled
-		"CYPRESS_USE_MOCKS": "1",
 	})
 }
