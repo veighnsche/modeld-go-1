@@ -36,7 +36,6 @@ type Manager struct {
 	adapter InferenceAdapter
 
 	// Inference / llama.cpp configuration (flag-driven, no envs)
-	RealInferEnabled bool
 	LlamaBin         string
 	LlamaCtx         int
 	LlamaThreads     int

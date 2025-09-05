@@ -23,7 +23,6 @@ func TestInfer_AdapterStartError(t *testing.T) {
 	dir := t.TempDir()
 	p := createModelFile(t, dir, "m.bin", 1)
 	m := NewWithConfig(ManagerConfig{Registry: []types.Model{{ID: "m", Path: p}}, DefaultModel: "m"})
-	m.RealInferEnabled = true
 	m.adapter = &fakeAdapter{startErr: errors.New("boom")}
 	if err := m.EnsureInstance(context.Background(), "m"); err != nil {
 		t.Fatalf("ensure: %v", err)
@@ -39,7 +38,6 @@ func TestInfer_AdapterGenerateError(t *testing.T) {
 	dir := t.TempDir()
 	p := createModelFile(t, dir, "m.bin", 1)
 	m := NewWithConfig(ManagerConfig{Registry: []types.Model{{ID: "m", Path: p}}, DefaultModel: "m"})
-	m.RealInferEnabled = true
 	m.adapter = &fakeAdapter{tokens: []string{"a"}, genErr: errors.New("gen")}
 	if err := m.EnsureInstance(context.Background(), "m"); err != nil {
 		t.Fatalf("ensure: %v", err)
@@ -51,10 +49,9 @@ func TestInfer_AdapterGenerateError(t *testing.T) {
 	}
 }
 
-func TestInfer_RealEnabled_ModelNotFound(t *testing.T) {
+func TestInfer_ModelNotFound(t *testing.T) {
 	// Empty registry ensures model not found when specifying unknown model
 	m := NewWithConfig(ManagerConfig{DefaultModel: ""})
-	m.RealInferEnabled = true
 	var buf bytes.Buffer
 	err := m.Infer(context.Background(), types.InferRequest{Model: "missing", Prompt: "p", Stream: true}, &buf, nil)
 	if err == nil || !IsModelNotFound(err) {
@@ -76,7 +73,6 @@ func TestInfer_TokenWriteErrorStops(t *testing.T) {
 	dir := t.TempDir()
 	p := createModelFile(t, dir, "m.bin", 1)
 	m := NewWithConfig(ManagerConfig{Registry: []types.Model{{ID: "m", Path: p}}, DefaultModel: "m"})
-	m.RealInferEnabled = true
 	m.adapter = &fakeAdapter{tokens: []string{"a", "b"}}
 	if err := m.EnsureInstance(context.Background(), "m"); err != nil {
 		t.Fatalf("ensure: %v", err)
@@ -117,12 +113,12 @@ func (s fakeSession) Generate(ctx context.Context, prompt string, onToken func(s
 
 func (s fakeSession) Close() error { return nil }
 
-func TestInfer_DependencyUnavailableWhenRealEnabledNoAdapter(t *testing.T) {
+func TestInfer_DependencyUnavailableWhenNoAdapter(t *testing.T) {
 	dir := t.TempDir()
 	p := createModelFile(t, dir, "m.bin", 1)
 	m := NewWithConfig(ManagerConfig{Registry: []types.Model{{ID: "m", Path: p}}, DefaultModel: "m"})
-	m.RealInferEnabled = true
-	// No adapter set
+	// Explicitly unset adapter to simulate missing runtime
+	m.adapter = nil
 	var buf bytes.Buffer
 	err := m.Infer(context.Background(), types.InferRequest{Prompt: "hi", Stream: true}, &buf, nil)
 	if err == nil || !IsDependencyUnavailable(err) {
@@ -134,7 +130,6 @@ func TestInfer_WithAdapterStreamsAndFinal(t *testing.T) {
 	dir := t.TempDir()
 	p := createModelFile(t, dir, "m.bin", 1)
 	m := NewWithConfig(ManagerConfig{Registry: []types.Model{{ID: "m", Path: p}}, DefaultModel: "m"})
-	m.RealInferEnabled = true
 	fa := &fakeAdapter{
 		tokens: []string{"he", "llo"},
 		final:  FinalResult{Content: "", FinishReason: "stop", Usage: Usage{}},

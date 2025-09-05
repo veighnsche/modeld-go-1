@@ -33,72 +33,65 @@ func (m *Manager) Infer(ctx context.Context, req types.InferRequest, w io.Writer
 	}
 	defer release()
 
-	// Feature flag: enable inference via adapter when configured.
-	if m.RealInferEnabled {
-		// If an adapter is provided, prefer it.
-		if m.adapter != nil {
-			// Resolve model path from registry
-			mdl, ok := m.getModelByID(modelID)
-			if !ok || strings.TrimSpace(mdl.Path) == "" {
-				return ErrModelNotFound(modelID)
-			}
-			// Map request parameters to adapter params (basic mapping for now)
-			params := InferParams{
-				Temperature:   float32(req.Temperature),
-				TopP:          float32(req.TopP),
-				TopK:          0, // optional, extend types.InferRequest if needed
-				MaxTokens:     req.MaxTokens,
-				Stop:          req.Stop,
-				Seed:          int(req.Seed),
-				RepeatPenalty: 0,
-			}
-			sess, err := m.adapter.Start(mdl.Path, params)
-			if err != nil {
-				return err
-			}
-			defer func() { _ = sess.Close() }()
-
-			var b strings.Builder
-			onTok := func(tok string) error {
-				if _, e := w.Write(tokenLineJSON(tok)); e != nil {
-					return e
-				}
-				b.WriteString(tok)
-				if flusher != nil {
-					flusher()
-				}
-				return nil
-			}
-			final, err := sess.Generate(ctx, req.Prompt, onTok)
-			if err != nil {
-				return err
-			}
-			// Compose final line
-			content := final.Content
-			if content == "" {
-				content = b.String()
-			}
-			end := map[string]any{
-				"done":          true,
-				"content":       content,
-				"finish_reason": final.FinishReason,
-				"usage":         final.Usage,
-			}
-			jb, _ := json.Marshal(end)
-			if _, err := w.Write(append(jb, '\n')); err != nil {
-				return err
-			}
-			if flusher != nil {
-				flusher()
-			}
-			return nil
-		}
-		// If real inference is enabled but no adapter is configured, report dependency error.
+	// Adapter-backed inference is the default; require an adapter.
+	if m.adapter == nil {
 		return ErrDependencyUnavailable("llama adapter not initialized")
 	}
+	// Resolve model path from registry
+	mdl, ok := m.getModelByID(modelID)
+	if !ok || strings.TrimSpace(mdl.Path) == "" {
+		return ErrModelNotFound(modelID)
+	}
+	// Map request parameters to adapter params (basic mapping for now)
+	params := InferParams{
+		Temperature:   float32(req.Temperature),
+		TopP:          float32(req.TopP),
+		TopK:          0, // optional, extend types.InferRequest if needed
+		MaxTokens:     req.MaxTokens,
+		Stop:          req.Stop,
+		Seed:          int(req.Seed),
+		RepeatPenalty: 0,
+	}
+	sess, err := m.adapter.Start(mdl.Path, params)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = sess.Close() }()
 
-	// Inference is not enabled; report dependency unavailable instead of mocking.
-	return ErrDependencyUnavailable("inference disabled")
+	var b strings.Builder
+	onTok := func(tok string) error {
+		if _, e := w.Write(tokenLineJSON(tok)); e != nil {
+			return e
+		}
+		b.WriteString(tok)
+		if flusher != nil {
+			flusher()
+		}
+		return nil
+	}
+	final, err := sess.Generate(ctx, req.Prompt, onTok)
+	if err != nil {
+		return err
+	}
+	// Compose final line
+	content := final.Content
+	if content == "" {
+		content = b.String()
+	}
+	end := map[string]any{
+		"done":          true,
+		"content":       content,
+		"finish_reason": final.FinishReason,
+		"usage":         final.Usage,
+	}
+	jb, _ := json.Marshal(end)
+	if _, err := w.Write(append(jb, '\n')); err != nil {
+		return err
+	}
+	if flusher != nil {
+		flusher()
+	}
+	return nil
 }
 
 // tokenLineJSON formats a token NDJSON line using json.Marshal for correctness.

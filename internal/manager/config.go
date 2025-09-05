@@ -21,7 +21,6 @@ type ManagerConfig struct {
 	MaxQueueDepth int
 	MaxWait       time.Duration
 	// Inference / llama.cpp configuration (no envs; set by callers)
-	RealInferEnabled bool
 	LlamaBin         string
 	LlamaCtx         int
 	LlamaThreads     int
@@ -49,14 +48,11 @@ func NewWithConfig(cfg ManagerConfig) *Manager {
 		m.maxWait = cfg.MaxWait
 	}
 	// Inference configuration
-	m.RealInferEnabled = cfg.RealInferEnabled
 	m.LlamaBin = cfg.LlamaBin
 	m.LlamaCtx = cfg.LlamaCtx
 	m.LlamaThreads = cfg.LlamaThreads
-	// Initialize in-process llama adapter when inference is enabled.
-	if m.RealInferEnabled {
-		m.adapter = NewLlamaAdapter(m.LlamaCtx, m.LlamaThreads)
-	}
+	// Initialize in-process llama adapter by default.
+	m.adapter = NewLlamaAdapter(m.LlamaCtx, m.LlamaThreads)
 	m.startTime = time.Now()
 	return m
 }

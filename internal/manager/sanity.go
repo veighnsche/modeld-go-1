@@ -6,7 +6,6 @@ import (
 
 // SanityReport describes runtime checks for external dependencies.
 type SanityReport struct {
-	RealInferEnabled bool   `json:"real_infer_enabled"`
 	LlamaFound       bool   `json:"llama_found"`
 	LlamaPath        string `json:"llama_path,omitempty"`
 	Error            string `json:"error,omitempty"`
@@ -15,10 +14,7 @@ type SanityReport struct {
 // SanityCheck validates that required dependencies are available for inference.
 // It does not mutate state and is safe to call at any time.
 func (m *Manager) SanityCheck() SanityReport {
-	r := SanityReport{RealInferEnabled: m.RealInferEnabled}
-	if !m.RealInferEnabled {
-		return r
-	}
+	r := SanityReport{}
 	// In-process inference: adapter must be initialized. We don't require external binaries.
 	if m.adapter == nil {
 		r.LlamaFound = false
