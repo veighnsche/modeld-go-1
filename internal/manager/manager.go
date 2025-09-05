@@ -29,9 +29,7 @@ type Manager struct {
 	maxWait       time.Duration
 
 	// Observability
-	startTime      time.Time
-	loadsTotal     uint64
-	evictionsTotal uint64
+	startTime time.Time
 }
 
 func New(reg []types.Model, budgetMB, marginMB int, defaultModel string) *Manager {

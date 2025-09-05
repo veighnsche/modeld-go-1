@@ -274,7 +274,10 @@ func postInfer(svc Service) http.HandlerFunc {
 func getHealthz() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok"))
+		if _, err := w.Write([]byte("ok")); err != nil {
+			// Best-effort logging; response has already been started
+			log.Printf("write response error: %v", err)
+		}
 	}
 }
 
@@ -289,10 +292,14 @@ func getReadyz(svc Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if svc.Ready() {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("ready"))
+			if _, err := w.Write([]byte("ready")); err != nil {
+				log.Printf("write response error: %v", err)
+			}
 			return
 		}
 		w.WriteHeader(http.StatusServiceUnavailable)
-		w.Write([]byte("loading"))
+		if _, err := w.Write([]byte("loading")); err != nil {
+			log.Printf("write response error: %v", err)
+		}
 	}
 }

@@ -9,7 +9,6 @@ import (
 // Logging
 func info(format string, a ...any) { fmt.Println(fmt.Sprintf(format, a...)) }
 func warn(format string, a ...any) { fmt.Println(fmt.Sprintf(format, a...)) }
-func die(format string, a ...any)  { fmt.Fprintln(os.Stderr, fmt.Sprintf(format, a...)); os.Exit(2) }
 func must(err error) {
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())

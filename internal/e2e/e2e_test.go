@@ -72,7 +72,9 @@ func TestE2E_Backpressure429(t *testing.T) {
 		if err != nil {
 			t.Fatalf("do req: %v", err)
 		}
-		io.Copy(io.Discard, resp.Body)
+		if _, err := io.Copy(io.Discard, resp.Body); err != nil {
+			t.Fatalf("io.Copy: %v", err)
+		}
 		resp.Body.Close()
 		return resp.StatusCode
 	}
