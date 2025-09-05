@@ -1,18 +1,100 @@
-# modeld-go (scaffold)
+# modeld-go
 
 ![CI](https://github.com/veighnsche/modeld-go-1/actions/workflows/ci-go.yml/badge.svg)
 [![codecov](https://codecov.io/gh/veighnsche/modeld-go-1/graph/badge.svg)](https://codecov.io/gh/veighnsche/modeld-go-1)
+[![CI (E2E Cypress UI)](https://github.com/veighnsche/modeld-go-1/actions/workflows/ci-e2e-cypress.yml/badge.svg)](https://github.com/veighnsche/modeld-go-1/actions/workflows/ci-e2e-cypress.yml)
+[![CI (E2E Python)](https://github.com/veighnsche/modeld-go-1/actions/workflows/ci-e2e-python.yml/badge.svg)](https://github.com/veighnsche/modeld-go-1/actions/workflows/ci-e2e-python.yml)
+[![CI (E2E Cypress UI + Live API)](https://github.com/veighnsche/modeld-go-1/actions/workflows/ci-e2e-cypress-live.yml/badge.svg)](https://github.com/veighnsche/modeld-go-1/actions/workflows/ci-e2e-cypress-live.yml)
 
-Minimal scaffold for a Go control-plane around llama.cpp:
-- Model switching
-- Readiness + events (SSE/WebSocket later)
-- Clean HTTP API surface
+Production-ready Go control-plane for llama.cpp:
+- Model switching and lifecycle management
+- Health/ready probes and streaming responses (NDJSON)
+- Clean HTTP API surface and basic observability
 
 ---
 
-# modeld-go
+## Overview
 
-A lightweight control-plane service (Go 1.22+) to manage multiple preloaded llama.cpp model instances within a configurable VRAM budget and margin, and to serve inference requests over a clean HTTP API. Hot math stays in llama.cpp (C/C++); Go handles lifecycle, I/O, backpressure, and observability.
+A lightweight control-plane service (Go 1.23+) to manage multiple preloaded llama.cpp model instances within a configurable VRAM budget and margin, and to serve inference requests over a clean HTTP API. Hot math stays in llama.cpp (C/C++); Go handles lifecycle, I/O, backpressure, and observability.
+
+## Quickstart
+
+- Prereqs: Go 1.23+, Node.js 20+ (for optional web harness), pnpm
+- Build & Run the API: see [docs/build-and-run.md](docs/build-and-run.md)
+- API reference (Swagger): see [docs/api.md](docs/api.md)
+
+## API Cheat Sheet
+
+Base URL examples:
+- Local: `http://localhost:8080`
+
+Health and readiness:
+
+```bash
+curl -sS http://localhost:8080/healthz
+# ok
+
+curl -i http://localhost:8080/readyz
+# 200 OK with body "ready" when ready, or 503 with body "loading"
+```
+
+List models:
+
+```bash
+curl -sS http://localhost:8080/models | jq .
+# {
+#   "models": [ { ... }, ... ]
+# }
+```
+
+Server status:
+
+```bash
+curl -sS http://localhost:8080/status | jq .
+# {
+#   "instances": [ { "model_id": "...", "state": "ready", ... } ],
+#   "budget_mb": 8192, "used_est_mb": 2048, ...
+# }
+```
+
+Inference (streams NDJSON):
+
+```bash
+curl -N \
+  -H 'Content-Type: application/json' \
+  -d '{
+        "prompt": "Write a haiku about the ocean.",
+        "model": "tinyllama-q4",
+        "stream": true,
+        "max_tokens": 64,
+        "temperature": 0.7,
+        "top_p": 0.9,
+        "stop": ["\n\n"]
+      }' \
+  http://localhost:8080/infer
+# Example NDJSON lines (shape may vary):
+# {"token":"The","done":false}
+# {"token":" ocean","done":false}
+# ...
+# {"done":true,"stats":{"duration_ms":1234}}
+```
+
+Optional per-request logging overrides:
+- Query: `?log=off|error|info|debug`
+- Headers: `X-Log-Level: off|error|info|debug`, `X-Log-Infer: 1`
+
+Metrics (Prometheus):
+
+```bash
+curl -sS http://localhost:8080/metrics | head -n 20
+# Prometheus text exposition format
+```
+
+Error responses (JSON):
+
+```json
+{"error":"invalid JSON body","code":400}
+```
 
 ## Documentation
 
@@ -41,169 +123,6 @@ See `LICENSE` for the full text. When adding new source files, you can include a
 
 ---
 
-## Visual Harness + Cypress E2E (Testing Add-on)
+## Testing
 
-This repo includes a minimal React-based visual test harness and a Cypress E2E suite to validate end-to-end behavior of the HTTP API (UI → API → stream → UI). This harness is strictly for testing and is not a production UI.
-
-### Structure
-
-- `web/` — Vite + React Router multi-page harness
-  - Pages:
-    - `Infer` — original streaming infer UI and controls
-    - `Health` — fetches and shows `/healthz`
-    - `Ready` — fetches and shows `/readyz`
-    - `Models` — fetches and shows `/models` (supports array or `{ models: [...] }`)
-    - `Status` — fetches and shows `/status`
-  - Top-level navigation links between pages
-  - Uses environment variables (no hardcoded URLs) and exposes a set of `data-testid` elements for automation
-- `e2e/` — Cypress E2E tests (e2e mode)
-  - Config: `e2e/cypress.config.ts`
-  - Specs: `e2e/specs/*.cy.ts`
-  - Support: `e2e/support/`
-- `scripts/cli/poll-url.js` — small Node helper to poll a URL until it returns an expected status
-- `package.json` (root) — orchestration scripts (with placeholders to adapt to your environment)
-
-### Web Harness
-
-Environment variables (via `web/.env` or your shell):
-
-- `VITE_API_BASE_URL` (e.g. `http://localhost:8080`)
-- `VITE_HEALTH_PATH` (default `/healthz`)
-- `VITE_READY_PATH` (default `/readyz`)
-- `VITE_MODELS_PATH` (default `/models`)
-- `VITE_STATUS_PATH` (default `/status`)
-- `VITE_INFER_PATH` (default `/infer`)
-- `VITE_SEND_STREAM_FIELD` (default `false`) — include `{ "stream": true }` in POST if your server requires it
-- `VITE_USE_MOCKS` (`true|false`, default `false`) — mock mode bypasses network and emits a deterministic NDJSON sequence
-
-Rendered test IDs in the SPA:
-
-- `data-testid="mode"` — `mock|live`
-- `data-testid="models-count"` — optional models count (calls `/models` on load)
-- `data-testid="prompt-input"` — textarea for prompt
-- `data-testid="model-input"` — optional model id (blank to use default)
-- `data-testid="submit-btn"` — send request
-- `data-testid="status"` — `idle|requesting|success|error`
-- `data-testid="stream-log"` — NDJSON lines appended as they arrive
-- `data-testid="result-json"` — full last response (best-effort) as JSON string
-- `data-testid="latency-ms"` — measured end-to-end duration in milliseconds
-
-### Cypress E2E
-
-Env file (copyable example at `.env.test.example`):
-
-- `CYPRESS_BASE_URL` — the harness URL (e.g., `http://localhost:5173` if using Vite preview default)
-- `CYPRESS_API_HEALTH_URL` — API health URL (e.g., `http://localhost:8080/healthz`)
-- `CYPRESS_API_READY_URL` — API ready URL (e.g., `http://localhost:8080/readyz`)
-- `CYPRESS_API_STATUS_URL` — API status URL (e.g., `http://localhost:8080/status`)
-- `CYPRESS_MAX_LATENCY_MS` — threshold for end-to-end latency (default 5000)
-- `CYPRESS_USE_MOCKS` — when `"1"`/`true`, E2E skips live API checks and relies on mock streaming
-
-Notes:
-- Cypress automatically picks up any environment variables prefixed with `CYPRESS_` and makes them available as `Cypress.env('<NAME_WITHOUT_PREFIX>')`.
-- For local runs you may also set `USE_MOCKS` in your shell and map it inside tests, but using the `CYPRESS_` prefix is recommended for CI.
-
-Artifacts on failure are written to `e2e/artifacts/` (screenshots/videos), and the suite includes a task to save arbitrary text files for debugging.
-
-Core spec: `e2e/specs/visual_infer.cy.ts`
-
-- Visits `/`, optionally waits for API `healthz` (live mode)
-- Types a prompt, optionally sets a model, clicks send
-- Asserts status transitions to `requesting` then `success`
-- Asserts `stream-log` contains ≥ 2 lines and final line indicates completion (contains `"done": true`)
-- Ensures `result-json` is non-empty and parseable JSON, no console errors, and latency under threshold
-
-Additional specs (best-effort):
-
-- `ready_flow.cy.ts` — verifies `readyz` transitions after first infer (skipped in mock mode)
-- `models_list.cy.ts` — verifies `/models` count renders if available
-- `errors.cy.ts` — invalid model name surfaces error (expects UI `status=error` and error text)
-
-### Orchestration Scripts (root `package.json`)
-
-The following scripts are provided and ready to use:
-
-- `dev:api` — `make run` (starts the Go API locally)
-- `dev:web` — `pnpm -C web dev` (starts Vite dev server)
-- `dev:all` — runs both concurrently
-- `test:e2e:open` — polls configured URLs then opens Cypress
-- `test:e2e:run` — polls configured URLs then runs Cypress headlessly
-
-Notes:
-
-- `scripts/cli/poll-url.js` is used before Cypress to avoid race conditions.
-- Install once at repo root with pnpm workspaces: `pnpm install`.
-- You can run package scripts in the `web/` workspace via pnpm filtering, e.g. `pnpm -C web build`.
-
-### Go CLI Helper (`bin/testctl`)
-
-A Go-based CLI orchestrates installs and tests across Go, Python, and Cypress. It auto-selects free ports and enforces a strict rule for UI tests: if host models exist in `~/models/llm`, `test web auto` runs against the live API; otherwise it runs in mock mode.
-
-Examples:
-
-```bash
-# Build the CLI
-make testctl-build
-
-# Install dependencies
-bin/testctl install all    # JS, Go, Python
-bin/testctl install js
-bin/testctl install go
-bin/testctl install py
-
-# Run tests
-bin/testctl test go                 # go test ./... -v
-bin/testctl test api:py             # pytest tests/e2e_py
-bin/testctl test web mock           # Cypress UI (mock mode)
-bin/testctl test web live:host      # Cypress UI (host models required)
-bin/testctl test web auto           # strict auto mode (host models => live)
-bin/testctl test all auto           # full suite (Go + Py + UI auto)
-```
-
-Notes:
-
-- The CLI will try to enable pnpm via corepack if available; otherwise ensure pnpm is installed.
-- Cypress baseUrl is set automatically via `CYPRESS_BASE_URL` to the dynamic preview port.
-
-Shortcuts:
-
-- `pnpm run cli` — runs `bin/testctl`.
-- `make test-all` — installs via testctl and runs the full suite with `test all auto`.
-
-#### Implementation structure (testctl)
-
-The CLI is implemented as a thin entrypoint with reusable internal logic:
-
-- `cmd/testctl/main.go` — minimal `main` that delegates to `internal/testctl.Main()`.
-- `internal/testctl/` — all CLI logic lives here and is unit-testable:
-  - `Run(args []string, cfg *Config) error` — dispatches subcommands.
-  - `ParseConfigWith(fs *flag.FlagSet, args []string) (*Config, []string)` — parses flags/env with an injectable `FlagSet` for tests.
-  - `ParseConfig()` — small wrapper over `ParseConfigWith` using `flag.CommandLine` and `os.Args[1:]`.
-  - `MainWithArgs(args []string) int` — testable entrypoint that returns an exit code.
-  - `Main() int` — production entrypoint used by `cmd/testctl`.
-
-Testing the CLI logic (unit):
-
-```bash
-go test ./internal/testctl -v
-```
-
-These tests stub indirect function variables (e.g., installers, runners) and verify dispatch/flag parsing without spawning subprocesses.
-
-### Quickstart
-
-1. Install deps (pnpm workspaces):
-   - `pnpm install`
-2. Configure envs:
-   - Copy `.env.test.example` → `.env.test` and edit as needed
-   - Edit `web/.env` (or use `web/.env.mock` for mock mode)
-3. Run everything:
-   - `pnpm run dev:all` (fills in your placeholders)
-   - Visit the harness at `CYPRESS_BASE_URL`
-4. Run tests (load env first):
-   - Bash/Zsh: `set -a; source .env.test; set +a`
-   - Then run:
-     - Headless: `pnpm run test:e2e:run`
-     - Interactive: `pnpm run test:e2e:open`
-
-All URLs/ports/paths are env-driven; there are no hardcoded values in the harness or tests.
+See [docs/testing.md](docs/testing.md) for Go unit tests, Python E2E, and Cypress UI testing, including local and CI workflows.
