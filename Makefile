@@ -6,7 +6,7 @@ COVER_MODE := atomic
 COVER_THRESHOLD ?= 80
 WEB_PORT ?= 5173
 
-.PHONY: build run tidy clean test cover cover-html cover-check e2e-py e2e-py-haiku \
+.PHONY: build run tidy clean test test-unit test-integration cover cover-html cover-check e2e-py e2e-py-haiku \
         swagger-install swagger-gen swagger-build swagger-run \
         web-build web-preview web-dev \
         e2e-cy-auto e2e-cy-haiku \
@@ -29,6 +29,14 @@ clean:
 
 test:
 	@env -u CGO_LDFLAGS -u CGO_CFLAGS -u LD_LIBRARY_PATH CGO_ENABLED=0 go test ./... -v
+
+test-unit:
+	@echo "Running unit tests (excluding integration build-tagged tests)"
+	@go test ./internal/manager -count=1 -v
+
+test-integration:
+	@echo "Running integration tests (integration build tag)"
+	@go test -tags=integration ./internal/manager -count=1 -v
 
 cover:
 	@bash -euo pipefail -c '\

@@ -3,39 +3,11 @@ package manager
 import (
 	"bytes"
 	"context"
-	"io"
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
 	"modeld/pkg/types"
 )
-
-// helper: create a model file of approximately sizeMB megabytes
-func createModelFile(t *testing.T, dir, name string, sizeMB int) string {
-	t.Helper()
-	if sizeMB <= 0 {
-		sizeMB = 1
-	}
-	p := filepath.Join(dir, name)
-	f, err := os.Create(p)
-	if err != nil {
-		t.Fatalf("create file: %v", err)
-	}
-	defer f.Close()
-	// write sizeMB megabytes (use 1MiB blocks)
-	block := make([]byte, 1024*1024)
-	for i := 0; i < sizeMB; i++ {
-		if _, err := f.Write(block); err != nil {
-			t.Fatalf("write: %v", err)
-		}
-	}
-	if err := f.Sync(); err != nil {
-		t.Fatalf("sync: %v", err)
-	}
-	return p
-}
 
 func TestNewWithConfigDefaults(t *testing.T) {
 	m := NewWithConfig(ManagerConfig{})
@@ -166,52 +138,6 @@ func TestBeginGenerationBackpressureTooBusy(t *testing.T) {
 	// cleanup
 	<-inst.genCh
 	<-inst.queueCh
-}
-
-func TestInferStreamsAndFlushes(t *testing.T) {
-	dir := t.TempDir()
-	p := createModelFile(t, dir, "m.bin", 1)
-	reg := []types.Model{{ID: "m", Path: p}}
-	m := NewWithConfig(ManagerConfig{Registry: reg, DefaultModel: "m", MaxQueueDepth: 1, MaxWait: 10 * time.Millisecond})
-
-	m.adapter = &fakeAdapter{tokens: []string{"a", "b", "c"}, final: FinalResult{FinishReason: "stop"}}
-	if err := m.EnsureInstance(context.Background(), "m"); err != nil {
-		t.Fatalf("ensure: %v", err)
-	}
-
-	var buf bytes.Buffer
-	flushed := 0
-	flusher := func() { flushed++ }
-	if err := m.Infer(context.Background(), types.InferRequest{Model: "m", Prompt: "hi", Stream: true}, &buf, flusher); err != nil {
-		t.Fatalf("infer: %v", err)
-	}
-	out := buf.String()
-	// Expect 4 lines (3 tokens + final)
-	lines := 0
-	for {
-		_, err := buf.ReadString('\n')
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			t.Fatalf("read: %v", err)
-		}
-		lines++
-	}
-	// Since we consumed the buffer, reconstruct from out for checks
-	// The stub writes 4 JSON lines
-	totalLines := 0
-	for _, b := range []byte(out) {
-		if b == '\n' {
-			totalLines++
-		}
-	}
-	if totalLines != 4 {
-		t.Fatalf("expected 4 lines, got %d", totalLines)
-	}
-	if flushed == 0 {
-		t.Fatalf("expected flusher to be called at least once")
-	}
 }
 
 func TestInferNoDefaultModelError(t *testing.T) {

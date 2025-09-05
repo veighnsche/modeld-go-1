@@ -1,3 +1,6 @@
+//go:build integration
+// +build integration
+
 package manager
 
 import (
@@ -121,16 +124,8 @@ func TestLlamaServerAdapter_ContextCancel(t *testing.T) {
 	if err != nil { t.Fatalf("start: %v", err) }
 	defer sess.Close()
 
-	_, err = sess.Generate(testCtx(t), "hello", func(string) error { return nil })
+	_, err = sess.Generate(context.Background(), "hello", func(string) error { return nil })
 	if err == nil {
 		t.Fatalf("expected context deadline exceeded or cancel error due to short req timeout")
 	}
-}
-
-// testCtx returns a context with timeout suitable for tests.
-func testCtx(t *testing.T) (ctx context.Context) {
-	t.Helper()
-	c, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	t.Cleanup(cancel)
-	return c
 }

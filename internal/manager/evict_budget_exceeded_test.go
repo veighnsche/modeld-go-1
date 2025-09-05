@@ -1,7 +1,6 @@
 package manager
 
 import (
-	"errors"
 	"testing"
 	"time"
 
