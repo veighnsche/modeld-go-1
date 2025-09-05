@@ -28,8 +28,9 @@ clean:
 test:
 	@go test ./... -v
 
+
 cover:
-	@pkgs=$$(go list ./... | grep -v '^modeld/cmd/'); \
+	@pkgs=$$(go list ./... | grep -v '^modeld/cmd/' | grep -v '^modeld/docs$$' | grep -v '^modeld/internal/testctl$$'); \
 	go test $$pkgs -covermode=$(COVER_MODE) -coverprofile=$(COVER_PROFILE) -v
 	@echo "Coverage profile written to $(COVER_PROFILE)"
 

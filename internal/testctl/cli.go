@@ -135,6 +135,13 @@ func ParseConfigWith(fs *flag.FlagSet, args []string) (*Config, []string) {
 // MainWithArgs is a testable variant of Main that accepts args explicitly.
 // It returns an exit code (0 for success, non-zero on error).
 func MainWithArgs(args []string) int {
+	// If user explicitly asks for help, print usage and exit 0
+	for _, a := range args {
+		if a == "-h" || a == "--help" || a == "help" {
+			usage()
+			return 0
+		}
+	}
 	fs := flag.NewFlagSet("testctl", flag.ContinueOnError)
 	cfg, rest := ParseConfigWith(fs, args)
 	if len(rest) == 0 {
