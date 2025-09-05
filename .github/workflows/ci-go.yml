@@ -33,7 +33,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SWAG_VERSION: v1.16.6
-      GOLANGCI_LINT_VERSION: v1.61.0
+      GOLANGCI_LINT_VERSION: v1.62.0
 
     steps:
       - name: Checkout
@@ -43,6 +43,17 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.24.x'
+
+      - name: Debug Go environment (1.24.x)
+        run: |
+          set -euo pipefail
+          echo "=== which go ===" && which go || true
+          echo "=== go version ===" && go version || true
+          echo "=== go env (key subset) ===" && go env GOROOT GOPATH GOMOD GOMODCACHE GOTOOLCHAIN GOEXPERIMENT || true
+          echo "=== go env -json ===" && go env -json || true
+          echo "=== go tool compile -V ===" && go tool compile -V || true
+          echo "=== uname -a ===" && uname -a || true
+          echo "=== cat go.mod ===" && sed -n '1,80p' go.mod || true
 
       - name: Cache Go modules
         uses: actions/cache@v4
@@ -146,16 +157,51 @@ jobs:
           # Build packages to populate export data cache; ignore failures to not block
           go build ./... || true
 
+      - name: Set up Go for linter (1.23.x)
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.x'
+
+      - name: Debug Go environment (1.23.x for linter)
+        env:
+          GOTOOLCHAIN: local
+        run: |
+          set -euo pipefail
+          echo "=== which go ===" && which go || true
+          echo "=== go version ===" && go version || true
+          echo "=== go env (key subset) ===" && go env GOROOT GOPATH GOMOD GOMODCACHE GOTOOLCHAIN GOEXPERIMENT || true
+          echo "=== go env -json ===" && go env -json || true
+          echo "=== go tool compile -V ===" && go tool compile -V || true
+          echo "=== uname -a ===" && uname -a || true
+          echo "=== cat go.mod ===" && sed -n '1,80p' go.mod || true
+
+      - name: Warm module cache and export data for linter (Go 1.23.x)
+        env:
+          GOTOOLCHAIN: local
+        run: |
+          set -euo pipefail
+          go env
+          go mod download
+          go list -deps ./... > /dev/null
+          go build ./... || true
+
       - name: Lint (golangci-lint)
         if: ${{ env.ACT != 'true' }}
         uses: golangci/golangci-lint-action@v6
         env:
-          GOTOOLCHAIN: auto
+          GOTOOLCHAIN: local
           GO111MODULE: on
           CGO_ENABLED: 1
         with:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
           args: --go=1.23 --modules-download-mode=mod --timeout=5m
+          skip-cache: true
+          skip-save-cache: true
+
+      - name: Restore Go version (1.24.x)
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
 
       - name: Run tests with coverage (library packages only)
         run: |
@@ -188,3 +234,15 @@ jobs:
           files: coverage.out
           flags: unittests
           fail_ci_if_error: true
+
+      - name: Final Go environment (always)
+        if: always()
+        run: |
+          set -euo pipefail
+          echo "=== FINAL which go ===" && which go || true
+          echo "=== FINAL go version ===" && go version || true
+          echo "=== FINAL go env (key subset) ===" && go env GOROOT GOPATH GOMOD GOMODCACHE GOTOOLCHAIN GOEXPERIMENT || true
+          echo "=== FINAL go env -json ===" && go env -json || true
+          echo "=== FINAL go tool compile -V ===" && go tool compile -V || true
+          echo "=== FINAL uname -a ===" && uname -a || true
+          echo "=== FINAL cat go.mod ===" && sed -n '1,80p' go.mod || true
