@@ -59,7 +59,7 @@ func (m *Manager) Infer(ctx context.Context, req types.InferRequest, w io.Writer
 
 			var b strings.Builder
 			onTok := func(tok string) error {
-				if _, e := io.WriteString(w, tokenLine(tok)); e != nil {
+				if _, e := w.Write(tokenLineJSON(tok)); e != nil {
 					return e
 				}
 				b.WriteString(tok)
@@ -129,10 +129,11 @@ func isTruthy(v string) bool {
 	}
 }
 
-// tokenLine formats a token NDJSON line.
-func tokenLine(tok string) string {
-	// naive JSON escaping for quotes and backslashes; sufficient for tokens
-	esc := strings.ReplaceAll(tok, "\\", "\\\\")
-	esc = strings.ReplaceAll(esc, "\"", "\\\"")
-	return "{\"token\":\"" + esc + "\"}\n"
+// tokenLineJSON formats a token NDJSON line using json.Marshal for correctness.
+func tokenLineJSON(tok string) []byte {
+    type tokenMsg struct {
+        Token string `json:"token"`
+    }
+    b, _ := json.Marshal(tokenMsg{Token: tok})
+    return append(b, '\n')
 }

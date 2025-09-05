@@ -2,13 +2,14 @@
 
 package manager
 
+// This file provides a no-CGO stub for the llama adapter. It is compiled when
+// the 'llama' build tag is NOT set, keeping default builds and CI CGO-free.
+// The real adapter lives in adapter_llamacpp_llama.go (tagged 'llama').
+
 import (
     "context"
     "errors"
     "strings"
-    // TODO: When the build environment is ready (CGO, compilers, and llama.cpp headers),
-    // add the real import and wire go-llama.cpp calls here.
-    // import "github.com/go-skynet/go-llama.cpp"
 )
 
 // llamaAdapter is a placeholder implementation that satisfies InferenceAdapter.

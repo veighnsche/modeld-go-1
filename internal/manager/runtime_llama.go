@@ -1,3 +1,5 @@
+//go:build llama_server
+
 package manager
 
 import (

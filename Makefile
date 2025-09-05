@@ -11,6 +11,7 @@ WEB_PORT ?= 5173
         web-build web-preview web-dev \
         e2e-cy-auto e2e-cy-haiku \
         test-all cli test-cli testctl-build \
+        llama-libs build-llama \
         ci-go ci-e2e-python ci-e2e-cypress ci-all
 
 build:
@@ -27,12 +28,12 @@ clean:
 	@rm -rf bin
 
 test:
-	@go test ./... -v
+	@env -u CGO_LDFLAGS -u CGO_CFLAGS -u LD_LIBRARY_PATH CGO_ENABLED=0 go test ./... -v
 
 
 cover:
 	@pkgs=$$(go list ./... | grep -v '^modeld/cmd/' | grep -v '^modeld/docs$$' | grep -v '^modeld/internal/testctl$$'); \
-	go test $$pkgs -covermode=$(COVER_MODE) -coverprofile=$(COVER_PROFILE) -v
+	env -u CGO_LDFLAGS -u CGO_CFLAGS -u LD_LIBRARY_PATH CGO_ENABLED=0 go test $$pkgs -covermode=$(COVER_MODE) -coverprofile=$(COVER_PROFILE) -v
 	@echo "Coverage profile written to $(COVER_PROFILE)"
 
 cover-html: cover
@@ -113,6 +114,24 @@ web-preview:
 
 web-dev:
 	@pnpm -C web dev --port $(WEB_PORT)
+
+# llama.cpp integration (no env vars; rpath baked via cgo directives)
+# Path where llama.cpp built artifacts reside (bin/ with libllama.so, libggml*.so, llama-server, etc.)
+LLAMA_BIN_DIR ?= $(HOME)/src/llama.cpp/build-cuda14/bin
+
+# Copy required shared libs into our local ./bin so rpath '$ORIGIN' resolves at runtime
+llama-libs:
+ 	@mkdir -p bin
+ 	@test -d "$(LLAMA_BIN_DIR)" || { echo "LLAMA_BIN_DIR not found: $(LLAMA_BIN_DIR)" >&2; exit 1; }
+ 	@install -m644 $(LLAMA_BIN_DIR)/libllama.so bin/
+ 	@install -m644 $(LLAMA_BIN_DIR)/libggml*.so bin/ 2>/dev/null || true
+ 	@echo "Synced llama.cpp shared libs to ./bin"
+
+# Build with the 'llama' build tag and CGO enabled; linking/rpath handled by internal/manager/llama_cgo.go
+build-llama: llama-libs
+ 	@mkdir -p bin
+ 	@CGO_ENABLED=1 go build -tags=llama -o $(BIN) ./cmd/modeld
+ 	@echo "Built $(BIN) with llama support (rpath=$$ORIGIN, no env vars required)"
 
 # Cypress E2E (UI harness)
 # Keep only the heavy, full-suite target here; all other variants live in the CLI.
