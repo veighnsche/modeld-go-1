@@ -48,7 +48,7 @@ e2e-py:
 
 # Tooling versions (can be overridden via environment)
 SWAG_VERSION ?= v1.16.6
-GOLANGCI_LINT_VERSION ?= v1.56.2
+GOLANGCI_LINT_VERSION ?= v1.61.0
 
 # Helpers
 # Set FORCE_PORT_UNBLOCK=1 to allow killing listeners; default is non-destructive.
