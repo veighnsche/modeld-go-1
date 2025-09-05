@@ -5,8 +5,8 @@ import (
 	"time"
 )
 
-// EnsureInstance is a placeholder for multi-instance ensure logic.
-// For now it delegates to EnsureModel to preserve behavior.
+// EnsureInstance ensures a model instance is initialized and marked ready
+// according to current resource budgeting and readiness state.
 func (m *Manager) EnsureInstance(ctx context.Context, modelID string) error {
 	if modelID == "" {
 		// If unspecified, use default if present; else no-op for now
@@ -46,11 +46,11 @@ func (m *Manager) EnsureInstance(ctx context.Context, modelID string) error {
 		}
 	}
 
-	// Simulate per-instance load/warmup state transition
+	// Perform per-instance load/warmup state transition
 	m.mu.Lock()
 	m.state = StateLoading
 	m.err = ""
-	// Create placeholder/loading instance if not present
+	// Create loading instance if not present
 	if m.instances == nil {
 		m.instances = make(map[string]*Instance)
 	}

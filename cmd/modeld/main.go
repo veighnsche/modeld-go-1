@@ -45,8 +45,8 @@ func main() {
 	corsOrigins := flag.String("cors-origins", "", "Comma-separated list of allowed CORS origins")
 	corsMethods := flag.String("cors-methods", "", "Comma-separated list of allowed CORS methods")
 	corsHeaders := flag.String("cors-headers", "", "Comma-separated list of allowed CORS request headers")
-	// Real inference / llama.cpp
-	realInfer := flag.Bool("real-infer", false, "Enable real inference (adapter-backed) instead of placeholder")
+	// Inference / llama.cpp
+	realInfer := flag.Bool("real-infer", false, "Enable inference (adapter-backed)")
 	llamaBin := flag.String("llama-bin", "", "Path to llama.cpp server binary (llama-server)")
 	llamaCtx := flag.Int("llama-ctx", 4096, "Context window size for llama.cpp")
 	llamaThreads := flag.Int("llama-threads", 0, "Threads for llama.cpp (0=auto)")
@@ -107,7 +107,7 @@ func main() {
 					*maxWait = d
 				}
 			}
-			// Real inference / llama.cpp (CLI has precedence)
+			// Inference / llama.cpp (CLI has precedence)
 			if !setFlags["real-infer"] {
 				*realInfer = cfg.RealInferEnabled
 			}

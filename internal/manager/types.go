@@ -36,7 +36,7 @@ type Instance struct {
 	// Queueing primitives
 	genCh   chan struct{} // size 1: single in-flight generation
 	queueCh chan struct{} // buffered: queue slots
-	// Runtime endpoint info (when real inference is enabled)
+	// Runtime endpoint info (when inference via external runtime is enabled)
 	Port int
 	// Process handle for managed runtime (e.g., llama-server)
 	Proc interface{}

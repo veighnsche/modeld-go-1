@@ -5,13 +5,14 @@ import (
 	"encoding/json"
 	"io"
 	"strings"
-	"time"
 
 	"modeld/pkg/types"
 )
 
-// Infer centralizes inference behavior. For MVP it ensures the instance
-// and writes placeholder NDJSON chunks to the provided writer.
+// Infer centralizes inference behavior. It ensures the model instance exists,
+// performs inference via the configured adapter when enabled, and streams
+// NDJSON token lines to the provided writer. If inference is not enabled,
+// it fails fast with a dependency-unavailable error (no mocking).
 func (m *Manager) Infer(ctx context.Context, req types.InferRequest, w io.Writer, flusher func()) error {
 	// Resolve target model id
 	modelID := req.Model
@@ -32,7 +33,7 @@ func (m *Manager) Infer(ctx context.Context, req types.InferRequest, w io.Writer
 	}
 	defer release()
 
-	// Feature flag: enable real inference when configured.
+	// Feature flag: enable inference via adapter when configured.
 	if m.RealInferEnabled {
 		// If an adapter is provided, prefer it.
 		if m.adapter != nil {
@@ -96,24 +97,8 @@ func (m *Manager) Infer(ctx context.Context, req types.InferRequest, w io.Writer
 		return ErrDependencyUnavailable("llama adapter not initialized")
 	}
 
-	// Fallback placeholder (legacy behavior)
-	chunks := []string{"{\"token\":\"Hello\"}", "{\"token\":\",\"}", "{\"token\":\" world\"}", "{\"done\":true}"}
-	for i, ch := range chunks {
-		if _, err := io.WriteString(w, ch+"\n"); err != nil {
-			return err
-		}
-		if flusher != nil {
-			flusher()
-		}
-		if i < len(chunks)-1 {
-			select {
-			case <-time.After(10 * time.Millisecond):
-			case <-ctx.Done():
-				return ctx.Err()
-			}
-		}
-	}
-	return nil
+	// Inference is not enabled; report dependency unavailable instead of mocking.
+	return ErrDependencyUnavailable("inference disabled")
 }
 
 // tokenLineJSON formats a token NDJSON line using json.Marshal for correctness.

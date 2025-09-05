@@ -12,14 +12,14 @@ type SanityReport struct {
 	Error            string `json:"error,omitempty"`
 }
 
-// SanityCheck validates that required external binaries are available.
+// SanityCheck validates that required dependencies are available for inference.
 // It does not mutate state and is safe to call at any time.
 func (m *Manager) SanityCheck() SanityReport {
 	r := SanityReport{RealInferEnabled: m.RealInferEnabled}
 	if !m.RealInferEnabled {
 		return r
 	}
-	// In-process mode: adapter must be initialized. We don't require external binaries.
+	// In-process inference: adapter must be initialized. We don't require external binaries.
 	if m.adapter == nil {
 		r.LlamaFound = false
 		r.Error = "llama adapter not initialized"

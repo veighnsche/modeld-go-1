@@ -32,11 +32,10 @@ type Manager struct {
 	startTime time.Time
 
 	// Optional inference adapter (e.g., llama.cpp). When set and enabled,
-	// Manager.Infer will delegate token generation to this adapter instead of
-	// the placeholder implementation.
+	// Manager.Infer will delegate token generation to this adapter.
 	adapter InferenceAdapter
 
-	// Real inference / llama.cpp configuration (flag-driven, no envs)
+	// Inference / llama.cpp configuration (flag-driven, no envs)
 	RealInferEnabled bool
 	LlamaBin         string
 	LlamaCtx         int

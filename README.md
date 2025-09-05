@@ -25,20 +25,20 @@ A lightweight control-plane service (Go 1.23+) to manage multiple preloaded llam
 
 ## Build modes and llama.cpp runtime
 
-There are two build modes. The default is a no-CGO stub for fast development and CI. The real in‑process llama runtime is available via build tags.
+There are two build modes. The default is a no-CGO stub for fast development and CI. The in‑process llama runtime is available via build tags.
 
 - Stub (default, no CGO):
   - No native dependencies. Useful for API/dev/CI.
   - Files: `internal/manager/adapter_llama_stub.go`.
 
-- In‑process llama (real, CGO):
+- In‑process llama (CGO):
   - Enabled with: `-tags=llama`.
   - Uses `github.com/go-skynet/go-llama.cpp` to run models in‑process.
   - Files: `internal/manager/adapter_llama.go`, `internal/manager/llama_cgo.go`.
 
 Notes
 
-- External `llama_server` process mode has been removed. All real inference goes through the in‑process go‑llama.cpp adapter.
+- External `llama_server` process mode has been removed. All inference goes through the in‑process go‑llama.cpp adapter.
 - `llama_cgo.go` sets an rpath of `$ORIGIN` so the loader can find `libllama.so` next to your built binary, if you place it there.
 
 ### Enabling in‑process llama
@@ -49,13 +49,13 @@ Notes
 go build -tags=llama ./cmd/modeld
 ```
 
-2) Provide a config that enables real inference and sets llama parameters (example snippet):
+2) Provide a config that enables inference and sets llama parameters (example snippet):
 
 ```go
 mgr := manager.NewWithConfig(manager.ManagerConfig{
     Registry: []types.Model{{ID: "tinyllama-q4", Path: "/path/to/model.gguf"}},
     DefaultModel:     "tinyllama-q4",
-    RealInferEnabled: true,
+    RealInferEnabled: true, // enables in‑process inference via go‑llama.cpp
     LlamaCtx:         4096,
     LlamaThreads:     8,
 })
@@ -209,23 +209,23 @@ Design goals:
 
 ## FAQ
 
-- __How do I enable real in‑process llama?__
+- __How do I enable in‑process llama?__
   Build with `-tags=llama` and set `RealInferEnabled: true` in `manager.ManagerConfig`. Also set `LlamaCtx` and `LlamaThreads` as needed.
 
 - __I get "cannot find -lllama" or runtime loader errors about `libllama.so`. What do I do?__
   Ensure the native llama library is available to the dynamic loader. Easiest is to place `libllama.so` next to your built binary; `internal/manager/llama_cgo.go` sets rpath `$ORIGIN` so the loader finds it there. Alternatively, install it in a system library path.
 
 - __Do I need an external `llama_server` process?__
-  No. External server mode was removed. All real inference is handled in‑process via `go-skynet/go-llama.cpp`.
+  No. External server mode was removed. All inference is handled in‑process via `go-skynet/go-llama.cpp`.
 
 - __Builds succeed but inference returns a dependency error.__
-  Make sure you built with `-tags=llama` and initialized the manager with `RealInferEnabled: true`. Without the tag, the stub adapter is used (no CGO) and real inference is disabled.
+  Make sure you built with `-tags=llama` and initialized the manager with `RealInferEnabled: true`. Without the tag, the stub adapter is used (no CGO) and inference is disabled.
 
 - __How do I configure the default model?__
   Provide your registry via `manager.ManagerConfig.Registry` and set `DefaultModel` to the desired model ID. The `Path` field must point to a valid `.gguf` file.
 
 - __How does streaming work?__
-  `POST /infer` streams NDJSON lines. For the real adapter, tokens are forwarded as they are generated. A final line includes `done: true` and simple usage info.
+  `POST /infer` streams NDJSON lines. For the adapter, tokens are forwarded as they are generated. A final line includes `done: true` and simple usage info.
 
 - __How is VRAM usage enforced?__
   The manager estimates model size from the file size (MB) and evicts least‑recently‑used idle instances when `BudgetMB` would be exceeded (plus `MarginMB`). See `internal/manager/instance_evict.go`.
