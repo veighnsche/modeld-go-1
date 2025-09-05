@@ -23,4 +23,13 @@ var (
 	// CI helpers
 	fnRunCIAll      = runCIAll
 	fnRunCIWorkflow = runCIWorkflow
+
+	// Verify helpers
+	fnVerifyHostDocker = verifyHostDocker
+	fnVerifyHostAct    = verifyHostAct
+
+    // CI installer helpers (install + verify)
+    fnRunCIInstallersAll    = runCIInstallersAll
+    fnRunCIInstallersAct    = runCIInstallersAct
+    fnRunCIInstallersDocker = runCIInstallersDocker
 )

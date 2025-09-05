@@ -70,3 +70,27 @@ func runCIAll(useCatthehacker bool, extraArgs []string) error {
 	}
 	return nil
 }
+
+// runCIInstallersAct installs and verifies 'act'.
+func runCIInstallersAct() error {
+	if err := installHostAct(); err != nil {
+		return err
+	}
+	return verifyHostAct()
+}
+
+// runCIInstallersDocker installs and verifies Docker.
+func runCIInstallersDocker() error {
+	if err := installHostDocker(); err != nil {
+		return err
+	}
+	return verifyHostDocker()
+}
+
+// runCIInstallersAll installs and verifies both Docker and act.
+func runCIInstallersAll() error {
+	if err := runCIInstallersDocker(); err != nil {
+		return err
+	}
+	return runCIInstallersAct()
+}

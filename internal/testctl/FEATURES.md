@@ -60,7 +60,7 @@ Focus: preparing model backends and host models for running the Go service with 
 
 - Llama.cpp (CUDA variants supported) — `install llama | llama:cuda | go-llama.cpp | go-llama.cpp:cuda`
   - Implementation: `internal/testctl/install_llama.go`
-  - Notes: Arch-focused prerequisites; builds `libllama.so`; prints env exports (`LLAMA_CPP_DIR`, `CGO_CFLAGS`, `CGO_LDFLAGS`, `LD_LIBRARY_PATH`, `CGO_ENABLED`).
+  - Notes: Linux-focused prerequisites (tested on Arch, Debian, and Ubuntu); builds `libllama.so`; prints env exports (`LLAMA_CPP_DIR`, `CGO_CFLAGS`, `CGO_LDFLAGS`, `LD_LIBRARY_PATH`, `CGO_ENABLED`).
 - Host models
   - Expected at `~/models/llm/*.gguf` (detected by `hasHostModels()` in `fs.go`).
 
@@ -181,8 +181,8 @@ Focus: UI end-to-end testing. Web commands are Cypress-only and not a general de
 Focus: running GitHub Actions locally and preparing a CI-like host.
 
 - Install CI tools
-  - GitHub Actions local runner — `install host:act` (`install_host.go`)
-  - Docker for CI — `install host:docker` (CI-only) (`install_host.go`)
+  - GitHub Actions local runner — `install host:act` (`install_host.go`) — supports Arch, Debian, and Ubuntu (apt or GitHub release fallback)
+  - Docker for CI — `install host:docker` (CI-only) (`install_host.go`) — supports Arch (pacman) and Debian/Ubuntu (apt)
   - CI combo — `install host:all` (docker + act; CI-only) (`install_host.go`)
 - Run workflows with `act` (`ci.go`)
   - All — `test ci all [runner:catthehacker|runner:default] [-- <extra act args>]`
@@ -213,7 +213,7 @@ Focus: local iteration helpers.
 - Web helpers (`web_helpers.go`): `buildWebWith`, `startPreview`, `runCypress`, `findLlamaBin`
 - Exec (`executil.go`): `RunCmd`, `runCmdVerbose`, `runCmdStreaming`, `runEnvCmdStreaming`
 - Testability indirection (`actions.go`): `fnInstallJS`, `fnRunGoTests`, `fnTestWebMock`, `fnRunCIAll`
-- OS detection (`os_helpers.go`): `isArchLike()` (installers target Arch-like systems)
+  - OS detection (`os_helpers.go`): `isArchLike()`, `isDebianLike()`, `isUbuntuLike()` (installers support Arch and Debian/Ubuntu)
 
 ### CLI: commands & options
 

@@ -1,0 +1,61 @@
+name: CI Installers
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  ubuntu-host:
+    name: Ubuntu Host (VM) — test install host tools
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build testctl CLI only
+        run: go build ./cmd/testctl
+
+      - name: Verify testctl runs
+        run: ./testctl --help
+
+      - name: Install act (host:act)
+        run: sudo ./testctl install host:act
+
+      - name: Install docker (host:docker)
+        run: sudo ./testctl install host:docker
+
+      - name: Install + Verify both via convenience command
+        run: ./testctl test ci installers all
+
+  ubuntu-container:
+    name: Catthehacker Ubuntu (container) — test act installer
+    runs-on: ubuntu-22.04
+    container:
+      image: ghcr.io/catthehacker/ubuntu:act-22.04
+    steps:
+      - name: Install essentials (apt)
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates curl git golang sudo
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build testctl CLI only (inside container)
+        run: go build ./cmd/testctl
+
+      - name: Verify testctl runs (inside container)
+        run: ./testctl --help
+
+      - name: Install act only (host:act)
+        run: ./testctl install host:act
+        # Note: Docker install is intentionally skipped in container because systemd isn't available.
+
+      - name: Install + Verify act via convenience command (container)
+        run: ./testctl test ci installers act

@@ -58,7 +58,20 @@ func buildRootCmdWith(cfg *Config) *cobra.Command {
 		if err := fnInstallHostDocker(); err != nil { return err }
 		return fnInstallHostAct()
 	}}
-	installCmd.AddCommand(installAll, installNode, installGo, installPy, installLlama, installLlamaCUDA, installGoLlama, installGoLlamaCUDA, installHostDocker, installHostAct, installHostAll)
+
+	// install verify subtree
+	verifyCmd := &cobra.Command{Use: "verify", Short: "Verify installed tools", Args: func(cmd *cobra.Command, args []string) error { return nil }, RunE: func(cmd *cobra.Command, args []string) error {
+		return fmt.Errorf("install verify requires a subcommand: host:docker|host:act|host:all")
+	}}
+	verifyHostDocker := &cobra.Command{Use: "host:docker", Short: "Verify Docker installation and service", RunE: func(cmd *cobra.Command, args []string) error { return fnVerifyHostDocker() }}
+	verifyHostAct := &cobra.Command{Use: "host:act", Short: "Verify act installation", RunE: func(cmd *cobra.Command, args []string) error { return fnVerifyHostAct() }}
+	verifyHostAll := &cobra.Command{Use: "host:all", Short: "Verify Docker and act installations", RunE: func(cmd *cobra.Command, args []string) error {
+		if err := fnVerifyHostDocker(); err != nil { return err }
+		return fnVerifyHostAct()
+	}}
+	verifyCmd.AddCommand(verifyHostDocker, verifyHostAct, verifyHostAll)
+
+	installCmd.AddCommand(installAll, installNode, installGo, installPy, installLlama, installLlamaCUDA, installGoLlama, installGoLlamaCUDA, installHostDocker, installHostAct, installHostAll, verifyCmd)
 	root.AddCommand(installCmd)
 
 	// test group
@@ -135,7 +148,16 @@ func buildRootCmdWith(cfg *Config) *cobra.Command {
 		}
 		return fnRunCIWorkflow(wf, useCat, extra)
 	}}
-	testCI.AddCommand(testCIAll, testCIOne)
+	// test ci installers (install + verify in one shot)
+	installersCmd := &cobra.Command{Use: "installers", Short: "Install and verify CI host tools", RunE: func(cmd *cobra.Command, args []string) error {
+		return fmt.Errorf("test ci installers requires a subcommand: all|act|docker")
+	}}
+	installersAll := &cobra.Command{Use: "all", Short: "Install and verify Docker and act", RunE: func(cmd *cobra.Command, args []string) error { return fnRunCIInstallersAll() }}
+	installersAct := &cobra.Command{Use: "act", Short: "Install and verify act only", RunE: func(cmd *cobra.Command, args []string) error { return fnRunCIInstallersAct() }}
+	installersDocker := &cobra.Command{Use: "docker", Short: "Install and verify Docker only", RunE: func(cmd *cobra.Command, args []string) error { return fnRunCIInstallersDocker() }}
+	installersCmd.AddCommand(installersAll, installersAct, installersDocker)
+
+	testCI.AddCommand(testCIAll, testCIOne, installersCmd)
 
 	testCmd.AddCommand(testGo, testPyAPI, testPyHaiku, testWeb, testAll, testCI)
 	root.AddCommand(testCmd)
