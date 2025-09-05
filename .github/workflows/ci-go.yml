@@ -137,19 +137,25 @@ jobs:
           set -euo pipefail
           go build -tags=swagger ./...
 
-      - name: Install golangci-lint
-        if: ${{ env.ACT != 'true' }}
-        uses: golangci/golangci-lint-action@v6
-        with:
-          version: ${{ env.GOLANGCI_LINT_VERSION }}
-
-      - name: Run golangci-lint
-        if: ${{ env.ACT != 'true' }}
-        env:
-          GOTOOLCHAIN: auto
+      - name: Warm module cache and export data for linter
         run: |
           set -euo pipefail
-          golangci-lint run
+          go env
+          # Ensure all deps and export data are available to the analyzer
+          go list -deps ./... > /dev/null
+          # Build packages to populate export data cache; ignore failures to not block
+          go build ./... || true
+
+      - name: Lint (golangci-lint)
+        if: ${{ env.ACT != 'true' }}
+        uses: golangci/golangci-lint-action@v6
+        env:
+          GOTOOLCHAIN: auto
+          GO111MODULE: on
+          CGO_ENABLED: 1
+        with:
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
+          args: --go=1.24 --modules-download-mode=mod --timeout=5m
 
       - name: Run tests with coverage (library packages only)
         run: |
