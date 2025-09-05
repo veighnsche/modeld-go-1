@@ -1,14 +1,14 @@
 package httpapi
 
 import (
-	"encoding/json"
-	"net/http"
 	"context"
+	"encoding/json"
 	"io"
 	"log"
-	"time"
+	"net/http"
 	"strings"
-	
+	"time"
+
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/go-chi/chi/v5"
@@ -168,7 +168,9 @@ func postInfer(svc Service) http.HandlerFunc {
 		if lvl >= LevelInfo {
 			if zlog != nil {
 				z := zlog.Info().Str("path", r.URL.Path).Str("model", req.Model)
-				if rid := middleware.GetReqID(r.Context()); rid != "" { z = z.Str("request_id", rid) }
+				if rid := middleware.GetReqID(r.Context()); rid != "" {
+					z = z.Str("request_id", rid)
+				}
 				z.Msg("infer start")
 			} else {
 				log.Printf("infer start path=%s model=%s", r.URL.Path, req.Model)
@@ -194,7 +196,9 @@ func postInfer(svc Service) http.HandlerFunc {
 				if lvl >= LevelInfo {
 					if zlog != nil {
 						z := zlog.Info().Str("status", "404").Dur("dur", time.Since(start))
-						if rid := middleware.GetReqID(r.Context()); rid != "" { z = z.Str("request_id", rid) }
+						if rid := middleware.GetReqID(r.Context()); rid != "" {
+							z = z.Str("request_id", rid)
+						}
 						z.Err(err).Msg("infer end")
 					} else {
 						log.Printf("infer end status=404 dur=%s err=%v", time.Since(start), err)
@@ -208,7 +212,9 @@ func postInfer(svc Service) http.HandlerFunc {
 				if lvl >= LevelInfo {
 					if zlog != nil {
 						z := zlog.Info().Str("status", "429").Dur("dur", time.Since(start))
-						if rid := middleware.GetReqID(r.Context()); rid != "" { z = z.Str("request_id", rid) }
+						if rid := middleware.GetReqID(r.Context()); rid != "" {
+							z = z.Str("request_id", rid)
+						}
 						z.Err(err).Msg("infer end")
 					} else {
 						log.Printf("infer end status=429 dur=%s err=%v", time.Since(start), err)
@@ -221,7 +227,9 @@ func postInfer(svc Service) http.HandlerFunc {
 				if lvl >= LevelInfo {
 					if zlog != nil {
 						z := zlog.Info().Int("status", he.StatusCode()).Dur("dur", time.Since(start))
-						if rid := middleware.GetReqID(r.Context()); rid != "" { z = z.Str("request_id", rid) }
+						if rid := middleware.GetReqID(r.Context()); rid != "" {
+							z = z.Str("request_id", rid)
+						}
 						z.Err(err).Msg("infer end")
 					} else {
 						log.Printf("infer end status=%d dur=%s err=%v", he.StatusCode(), time.Since(start), err)
@@ -233,7 +241,9 @@ func postInfer(svc Service) http.HandlerFunc {
 			if lvl >= LevelInfo {
 				if zlog != nil {
 					z := zlog.Info().Str("status", "500").Dur("dur", time.Since(start))
-					if rid := middleware.GetReqID(r.Context()); rid != "" { z = z.Str("request_id", rid) }
+					if rid := middleware.GetReqID(r.Context()); rid != "" {
+						z = z.Str("request_id", rid)
+					}
 					z.Err(err).Msg("infer end")
 				} else {
 					log.Printf("infer end status=500 dur=%s err=%v", time.Since(start), err)
@@ -244,7 +254,9 @@ func postInfer(svc Service) http.HandlerFunc {
 		if lvl >= LevelInfo {
 			if zlog != nil {
 				z := zlog.Info().Str("status", "200").Dur("dur", time.Since(start))
-				if rid := middleware.GetReqID(r.Context()); rid != "" { z = z.Str("request_id", rid) }
+				if rid := middleware.GetReqID(r.Context()); rid != "" {
+					z = z.Str("request_id", rid)
+				}
 				z.Msg("infer end")
 			} else {
 				log.Printf("infer end status=200 dur=%s", time.Since(start))

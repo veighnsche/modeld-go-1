@@ -19,7 +19,9 @@ func runPyTests() error {
 	pytest := filepath.Join(venv, "bin", "pytest")
 	if _, err := os.Stat(pytest); os.IsNotExist(err) {
 		info("Python venv not found; installing...")
-		if err := installPy(); err != nil { return err }
+		if err := installPy(); err != nil {
+			return err
+		}
 	}
 	return runCmdStreaming(context.Background(), pytest, "-q", pyDir)
 }

@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"log"
 	"net/http/httptest"
-	"testing"
 	"strings"
+	"testing"
 )
 
 func TestParseLevel(t *testing.T) {

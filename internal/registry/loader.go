@@ -37,9 +37,13 @@ func (s *GGUFScanner) Scan(dir string) ([]types.Model, error) {
 	}
 	var models []types.Model
 	for _, e := range entries {
-		if e.IsDir() { continue }
+		if e.IsDir() {
+			continue
+		}
 		name := e.Name()
-		if !isGGUF(name) { continue }
+		if !isGGUF(name) {
+			continue
+		}
 		// Use full filename as ID (e.g., "llama-3.1-8b-q4_k_m.gguf")
 		id := name
 		p := filepath.Join(abs, name)

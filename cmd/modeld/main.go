@@ -7,15 +7,15 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"syscall"
-	"time"
 	"path/filepath"
 	"strings"
+	"syscall"
+	"time"
 
-	"modeld/internal/httpapi"
 	"modeld/internal/config"
-	"modeld/internal/registry"
+	"modeld/internal/httpapi"
 	"modeld/internal/manager"
+	"modeld/internal/registry"
 
 	"github.com/rs/zerolog"
 )
@@ -56,23 +56,51 @@ func main() {
 		if cfg, err := config.Load(*configPath); err != nil {
 			log.Fatalf("failed to load config file: %v", err)
 		} else {
-			if !setFlags["addr"] && cfg.Addr != "" { *addr = cfg.Addr }
-			if !setFlags["models-dir"] && cfg.ModelsDir != "" { *modelsDir = cfg.ModelsDir }
-			if !setFlags["vram-budget-mb"] && cfg.VRAMBudgetMB != 0 { *vramBudgetMB = cfg.VRAMBudgetMB }
-			if !setFlags["vram-margin-mb"] && cfg.VRAMMarginMB != 0 { *vramMarginMB = cfg.VRAMMarginMB }
-			if !setFlags["default-model"] && cfg.DefaultModel != "" { *defaultModel = cfg.DefaultModel }
-			if !setFlags["log-level"] && cfg.LogLevel != "" { *logLevel = cfg.LogLevel }
-			if !setFlags["max-body-bytes"] && cfg.MaxBodyBytes > 0 { *maxBodyBytes = cfg.MaxBodyBytes }
-			if !setFlags["infer-timeout"] && cfg.InferTimeout != "" {
-				if d, err := time.ParseDuration(cfg.InferTimeout); err == nil { *inferTimeout = d }
+			if !setFlags["addr"] && cfg.Addr != "" {
+				*addr = cfg.Addr
 			}
-			if !setFlags["cors-enabled"] { *corsEnabled = cfg.CORSEnabled }
-			if !setFlags["cors-origins"] && len(cfg.CORSAllowedOrigins) > 0 { *corsOrigins = strings.Join(cfg.CORSAllowedOrigins, ",") }
-			if !setFlags["cors-methods"] && len(cfg.CORSAllowedMethods) > 0 { *corsMethods = strings.Join(cfg.CORSAllowedMethods, ",") }
-			if !setFlags["cors-headers"] && len(cfg.CORSAllowedHeaders) > 0 { *corsHeaders = strings.Join(cfg.CORSAllowedHeaders, ",") }
-			if !setFlags["max-queue-depth"] && cfg.MaxQueueDepth > 0 { *maxQueueDepth = cfg.MaxQueueDepth }
+			if !setFlags["models-dir"] && cfg.ModelsDir != "" {
+				*modelsDir = cfg.ModelsDir
+			}
+			if !setFlags["vram-budget-mb"] && cfg.VRAMBudgetMB != 0 {
+				*vramBudgetMB = cfg.VRAMBudgetMB
+			}
+			if !setFlags["vram-margin-mb"] && cfg.VRAMMarginMB != 0 {
+				*vramMarginMB = cfg.VRAMMarginMB
+			}
+			if !setFlags["default-model"] && cfg.DefaultModel != "" {
+				*defaultModel = cfg.DefaultModel
+			}
+			if !setFlags["log-level"] && cfg.LogLevel != "" {
+				*logLevel = cfg.LogLevel
+			}
+			if !setFlags["max-body-bytes"] && cfg.MaxBodyBytes > 0 {
+				*maxBodyBytes = cfg.MaxBodyBytes
+			}
+			if !setFlags["infer-timeout"] && cfg.InferTimeout != "" {
+				if d, err := time.ParseDuration(cfg.InferTimeout); err == nil {
+					*inferTimeout = d
+				}
+			}
+			if !setFlags["cors-enabled"] {
+				*corsEnabled = cfg.CORSEnabled
+			}
+			if !setFlags["cors-origins"] && len(cfg.CORSAllowedOrigins) > 0 {
+				*corsOrigins = strings.Join(cfg.CORSAllowedOrigins, ",")
+			}
+			if !setFlags["cors-methods"] && len(cfg.CORSAllowedMethods) > 0 {
+				*corsMethods = strings.Join(cfg.CORSAllowedMethods, ",")
+			}
+			if !setFlags["cors-headers"] && len(cfg.CORSAllowedHeaders) > 0 {
+				*corsHeaders = strings.Join(cfg.CORSAllowedHeaders, ",")
+			}
+			if !setFlags["max-queue-depth"] && cfg.MaxQueueDepth > 0 {
+				*maxQueueDepth = cfg.MaxQueueDepth
+			}
 			if !setFlags["max-wait"] && cfg.MaxWait != "" {
-				if d, err := time.ParseDuration(cfg.MaxWait); err == nil { *maxWait = d }
+				if d, err := time.ParseDuration(cfg.MaxWait); err == nil {
+					*maxWait = d
+				}
 			}
 		}
 	}
@@ -133,9 +161,19 @@ func main() {
 	}
 	// Configure CORS if enabled; provide sensible defaults if lists are empty
 	var origins, methods, headers []string
-	if *corsOrigins != "" { origins = splitCSV(*corsOrigins) }
-	if *corsMethods != "" { methods = splitCSV(*corsMethods) } else { methods = []string{"GET", "POST", "OPTIONS"} }
-	if *corsHeaders != "" { headers = splitCSV(*corsHeaders) } else { headers = []string{"Accept", "Authorization", "Content-Type", "X-Requested-With", "X-Log-Level"} }
+	if *corsOrigins != "" {
+		origins = splitCSV(*corsOrigins)
+	}
+	if *corsMethods != "" {
+		methods = splitCSV(*corsMethods)
+	} else {
+		methods = []string{"GET", "POST", "OPTIONS"}
+	}
+	if *corsHeaders != "" {
+		headers = splitCSV(*corsHeaders)
+	} else {
+		headers = []string{"Accept", "Authorization", "Content-Type", "X-Requested-With", "X-Log-Level"}
+	}
 	httpapi.SetCORSOptions(*corsEnabled, origins, methods, headers)
 	// NewMux registers: /models, /status, /infer, /healthz, /readyz, /metrics
 	mux := httpapi.NewMux(mgr)

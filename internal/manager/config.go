@@ -14,10 +14,10 @@ const (
 
 // ManagerConfig encapsulates all tunables for Manager construction.
 type ManagerConfig struct {
-	Registry     []types.Model
-	BudgetMB     int
-	MarginMB     int
-	DefaultModel string
+	Registry      []types.Model
+	BudgetMB      int
+	MarginMB      int
+	DefaultModel  string
 	MaxQueueDepth int
 	MaxWait       time.Duration
 }

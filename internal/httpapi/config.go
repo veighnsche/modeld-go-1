@@ -27,7 +27,7 @@ func SetInferTimeoutSeconds(sec int64) {
 
 // CORS configuration (opt-in). If disabled, no CORS middleware is added.
 var (
-	corsEnabled bool
+	corsEnabled        bool
 	corsAllowedOrigins []string
 	corsAllowedMethods []string
 	corsAllowedHeaders []string

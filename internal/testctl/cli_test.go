@@ -82,7 +82,9 @@ func TestRun_TestCommands(t *testing.T) {
 	calledMock := 0
 	cleanup = withCLIStubs(t, func() {
 		fnTestWebMock = func(c *Config) error {
-			if c.WebPort != cfg.WebPort { t.Fatalf("cfg mismatch") }
+			if c.WebPort != cfg.WebPort {
+				t.Fatalf("cfg mismatch")
+			}
 			calledMock++
 			return nil
 		}
@@ -91,7 +93,9 @@ func TestRun_TestCommands(t *testing.T) {
 	if err := Run([]string{"test", "web", "mock"}, cfg); err != nil {
 		t.Fatalf("test web mock: unexpected err: %v", err)
 	}
-	if calledMock != 1 { t.Fatalf("mock not called") }
+	if calledMock != 1 {
+		t.Fatalf("mock not called")
+	}
 
 	// web live:host
 	calledLive := 0
@@ -102,7 +106,9 @@ func TestRun_TestCommands(t *testing.T) {
 	if err := Run([]string{"test", "web", "live:host"}, cfg); err != nil {
 		t.Fatalf("test web live:host: unexpected err: %v", err)
 	}
-	if calledLive != 1 { t.Fatalf("live not called") }
+	if calledLive != 1 {
+		t.Fatalf("live not called")
+	}
 
 	// web auto: with host models
 	calledLive = 0
@@ -115,7 +121,9 @@ func TestRun_TestCommands(t *testing.T) {
 	if err := Run([]string{"test", "web", "auto"}, cfg); err != nil {
 		t.Fatalf("test web auto (host): unexpected err: %v", err)
 	}
-	if calledLive != 1 { t.Fatalf("live not called in auto when host models present") }
+	if calledLive != 1 {
+		t.Fatalf("live not called in auto when host models present")
+	}
 
 	// web auto: without host models
 	calledMock = 0
@@ -128,7 +136,9 @@ func TestRun_TestCommands(t *testing.T) {
 	if err := Run([]string{"test", "web", "auto"}, cfg); err != nil {
 		t.Fatalf("test web auto (mock): unexpected err: %v", err)
 	}
-	if calledMock != 1 { t.Fatalf("mock not called in auto when no host models") }
+	if calledMock != 1 {
+		t.Fatalf("mock not called in auto when no host models")
+	}
 
 	// all auto: fanout
 	calls := make(map[string]int)

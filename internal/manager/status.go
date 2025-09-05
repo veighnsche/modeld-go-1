@@ -24,12 +24,12 @@ func (m *Manager) Status() types.StatusResponse {
 	resp.Instances = make([]types.InstanceStatus, 0, len(m.instances))
 	for _, inst := range m.instances {
 		resp.Instances = append(resp.Instances, types.InstanceStatus{
-			ModelID:   inst.ID,
-			State:     string(inst.State),
-			LastUsed:  inst.LastUsed.Unix(),
-			EstVRAMMB: inst.EstVRAMMB,
-			QueueLen:  len(inst.queueCh),
-			Inflight:  len(inst.genCh),
+			ModelID:       inst.ID,
+			State:         string(inst.State),
+			LastUsed:      inst.LastUsed.Unix(),
+			EstVRAMMB:     inst.EstVRAMMB,
+			QueueLen:      len(inst.queueCh),
+			Inflight:      len(inst.genCh),
 			MaxQueueDepth: cap(inst.queueCh),
 		})
 	}

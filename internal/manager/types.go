@@ -31,8 +31,8 @@ type Snapshot struct {
 // integration and allows the Instance to hold a reference without dictating
 // a concrete implementation yet.
 type Adapter interface {
-    // Close releases resources associated with the adapter.
-    Close() error
+	// Close releases resources associated with the adapter.
+	Close() error
 }
 
 // Instance represents a live model context (one per model id).

@@ -10,7 +10,11 @@ func withEnv(key, val string) func() {
 	old, had := os.LookupEnv(key)
 	os.Setenv(key, val)
 	return func() {
-		if had { os.Setenv(key, old) } else { os.Unsetenv(key) }
+		if had {
+			os.Setenv(key, old)
+		} else {
+			os.Unsetenv(key)
+		}
 	}
 }
 

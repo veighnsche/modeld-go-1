@@ -3,15 +3,17 @@ package testctl
 // Indirection layer to allow stubbing in tests
 
 var (
-	fnInstallJS        = installJS
-	fnInstallGo        = installGo
-	fnInstallPy        = installPy
+	fnInstallJS         = installJS
+	fnInstallGo         = installGo
+	fnInstallPy         = installPy
+	fnInstallHostDocker = installHostDocker
+	fnInstallHostAct    = installHostAct
 
-	fnRunGoTests       = runGoTests
-	fnRunPyTests       = runPyTests
+	fnRunGoTests = runGoTests
+	fnRunPyTests = runPyTests
 
-	fnTestWebMock      = testWebMock
-	fnTestWebLiveHost  = testWebLiveHost
+	fnTestWebMock     = testWebMock
+	fnTestWebLiveHost = testWebLiveHost
 
-	fnHasHostModels    = hasHostModels
+	fnHasHostModels = hasHostModels
 )

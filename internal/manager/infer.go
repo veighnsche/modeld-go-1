@@ -25,7 +25,9 @@ func (m *Manager) Infer(ctx context.Context, req types.InferRequest, w io.Writer
 	}
 	// Admission: per-instance FIFO queue, single in-flight
 	release, err := m.beginGeneration(ctx, modelID)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	defer release()
 	chunks := []string{"{\"token\":\"Hello\"}", "{\"token\":\",\"}", "{\"token\":\" world\"}", "{\"done\":true}"}
 	for i, ch := range chunks {

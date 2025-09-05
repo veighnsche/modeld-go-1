@@ -2,8 +2,8 @@ package httpapi
 
 import (
 	"encoding/json"
-	"net/http"
 	"modeld/pkg/types"
+	"net/http"
 )
 
 // HTTPError allows services to provide an HTTP status code for an error.

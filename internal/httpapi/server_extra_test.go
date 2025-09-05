@@ -34,9 +34,9 @@ func TestInferLogsWithZerologInfo(t *testing.T) {
 	}
 }
 
-func (b *blockService) ListModels() []types.Model { return nil }
+func (b *blockService) ListModels() []types.Model    { return nil }
 func (b *blockService) Status() types.StatusResponse { return types.StatusResponse{} }
-func (b *blockService) Ready() bool { return true }
+func (b *blockService) Ready() bool                  { return true }
 func (b *blockService) Infer(ctx context.Context, req types.InferRequest, w io.Writer, flush func()) error {
 	<-ctx.Done()
 	return ctx.Err()

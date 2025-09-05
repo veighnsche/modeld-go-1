@@ -11,7 +11,9 @@ import (
 // chooseFreePort finds an available TCP port by asking the kernel for :0
 func chooseFreePort() (int, error) {
 	l, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil { return 0, err }
+	if err != nil {
+		return 0, err
+	}
 	defer l.Close()
 	addr := l.Addr().(*net.TCPAddr)
 	return addr.Port, nil
@@ -30,7 +32,7 @@ func isPortBusy(port int) (bool, string) {
 func waitHTTP(url string, want int, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	client := &http.Client{ Timeout: 2 * time.Second }
+	client := &http.Client{Timeout: 2 * time.Second}
 	for {
 		req, _ := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 		resp, err := client.Do(req)

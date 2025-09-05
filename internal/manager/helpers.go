@@ -18,15 +18,15 @@ func (m *Manager) getModelByID(id string) (types.Model, bool) {
 
 // Helper: estimate VRAM based on file size (MB). Returns 0 on error.
 func (m *Manager) estimateVRAMMB(mdl types.Model) int {
-    fi, err := os.Stat(mdl.Path)
-    if err != nil {
-        // If we cannot stat the file, return a conservative minimum of 1MB
-        // to avoid bypassing budget checks due to an unknown size.
-        return 1
-    }
-    mb := int(fi.Size() / (1024 * 1024))
-    if mb <= 0 {
-        mb = 1
-    }
-    return mb
+	fi, err := os.Stat(mdl.Path)
+	if err != nil {
+		// If we cannot stat the file, return a conservative minimum of 1MB
+		// to avoid bypassing budget checks due to an unknown size.
+		return 1
+	}
+	mb := int(fi.Size() / (1024 * 1024))
+	if mb <= 0 {
+		mb = 1
+	}
+	return mb
 }

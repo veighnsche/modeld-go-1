@@ -1,6 +1,7 @@
 name: CI (E2E Cypress UI)
 
 on:
+  workflow_dispatch:
   push:
     branches: [ main, master ]
     paths:
@@ -41,10 +42,22 @@ jobs:
         with:
           go-version: '1.22.x'
 
+      - name: Cache Go modules and build cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: 'pnpm-lock.yaml'
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
@@ -52,12 +65,31 @@ jobs:
           version: 9
 
       - name: Install headless display (xvfb)
-        run: sudo apt-get update -y && sudo apt-get install -y xvfb
-
-      - name: Build testctl
         run: |
-          mkdir -p bin
-          go build -o bin/testctl ./cmd/testctl
+          if command -v sudo >/dev/null 2>&1; then
+            sudo apt-get update -y && sudo apt-get install -y xvfb
+          else
+            apt-get update -y && apt-get install -y xvfb
+          fi
+
+      - name: Download testctl artifact (if available)
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: testctl-bin-ubuntu
+          path: bin
+
+      - name: Ensure testctl exists (build if missing)
+        run: |
+          set -euo pipefail
+          if [ ! -f bin/testctl ]; then
+            echo "Artifact not found; building testctl from source"
+            mkdir -p bin
+            go build -o bin/testctl ./cmd/testctl
+          else
+            echo "Using downloaded testctl artifact"
+            chmod +x bin/testctl
+          fi
 
       - name: Install JS dependencies (via testctl)
         run: bin/testctl install js

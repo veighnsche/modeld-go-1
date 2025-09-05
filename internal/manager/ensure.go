@@ -50,7 +50,9 @@ func (m *Manager) EnsureInstance(ctx context.Context, modelID string) error {
 	m.state = StateLoading
 	m.err = ""
 	// Create placeholder/loading instance if not present
-	if m.instances == nil { m.instances = make(map[string]*Instance) }
+	if m.instances == nil {
+		m.instances = make(map[string]*Instance)
+	}
 	inst, existed := m.instances[modelID]
 	addedNow := false
 	if !existed || inst == nil {

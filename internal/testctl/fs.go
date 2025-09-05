@@ -9,9 +9,13 @@ import (
 
 func firstGGUF(dir string) (string, error) {
 	entries, err := os.ReadDir(dir)
-	if err != nil { return "", err }
+	if err != nil {
+		return "", err
+	}
 	for _, e := range entries {
-		if e.IsDir() { continue }
+		if e.IsDir() {
+			continue
+		}
 		name := e.Name()
 		if strings.HasSuffix(strings.ToLower(name), ".gguf") {
 			return name, nil
@@ -23,9 +27,13 @@ func firstGGUF(dir string) (string, error) {
 func hasHostModels() bool {
 	dir := filepath.Join(homeDir(), "models", "llm")
 	entries, err := os.ReadDir(dir)
-	if err != nil { return false }
+	if err != nil {
+		return false
+	}
 	for _, e := range entries {
-		if e.IsDir() { continue }
+		if e.IsDir() {
+			continue
+		}
 		if strings.HasSuffix(strings.ToLower(e.Name()), ".gguf") {
 			return true
 		}
@@ -34,7 +42,9 @@ func hasHostModels() bool {
 }
 
 func homeDir() string {
-	if h := os.Getenv("HOME"); h != "" { return h }
+	if h := os.Getenv("HOME"); h != "" {
+		return h
+	}
 	h, _ := os.UserHomeDir()
 	return h
 }

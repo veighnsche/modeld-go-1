@@ -13,7 +13,7 @@ func TestGGUFScanner_ScanFiltersGGUF(t *testing.T) {
 	// create files
 	files := []string{
 		"a.gguf",
-		"b.GGUF",         // case-insensitive
+		"b.GGUF", // case-insensitive
 		"not-model.txt",
 		"model.bin",
 	}
