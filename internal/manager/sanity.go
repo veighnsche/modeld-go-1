@@ -19,28 +19,20 @@ func (m *Manager) SanityCheck() SanityReport {
 	if !m.RealInferEnabled {
 		return r
 	}
-	// Try configured path first, then discovery.
-	bin := m.LlamaBin
-	if bin == "" {
-		bin = discoverLlamaBin()
-	}
-	if bin == "" {
+	// In-process mode: adapter must be initialized. We don't require external binaries.
+	if m.adapter == nil {
 		r.LlamaFound = false
-		r.Error = "llama-server not found"
+		r.Error = "llama adapter not initialized"
 		return r
 	}
-	if fi, err := os.Stat(bin); err == nil && !fi.IsDir() {
-		r.LlamaFound = true
-		r.LlamaPath = bin
-		return r
-	} else {
-		r.LlamaFound = false
-		r.LlamaPath = bin
-		if err != nil {
-			r.Error = err.Error()
-		} else {
-			r.Error = "llama path is a directory"
+	// Optionally perform a lightweight check: verify default model path exists if set.
+	r.LlamaFound = true
+	if m.defaultModel != "" {
+		if mdl, ok := m.getModelByID(m.defaultModel); ok && mdl.Path != "" {
+			if fi, err := os.Stat(mdl.Path); err == nil && !fi.IsDir() {
+				r.LlamaPath = mdl.Path
+			}
 		}
-		return r
 	}
+	return r
 }

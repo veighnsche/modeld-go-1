@@ -1,13 +1,9 @@
 package manager
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
-	"net/http"
 	"strings"
 	"time"
 
@@ -96,112 +92,8 @@ func (m *Manager) Infer(ctx context.Context, req types.InferRequest, w io.Writer
 			}
 			return nil
 		}
-
-		// Otherwise, call llama-server over HTTP.
-		m.mu.RLock()
-		inst := m.instances[modelID]
-		port := 0
-		if inst != nil {
-			port = inst.Port
-		}
-		m.mu.RUnlock()
-		if port == 0 {
-			return fmt.Errorf("instance for %s has no runtime port", modelID)
-		}
-		// Build request body for llama.cpp /completion streaming endpoint
-		body := map[string]any{
-			"prompt":      req.Prompt,
-			"stream":      true,
-			"n_predict":   req.MaxTokens,
-			"temperature": req.Temperature,
-			"top_p":       req.TopP,
-		}
-		if len(req.Stop) > 0 {
-			body["stop"] = req.Stop
-		}
-		if req.Seed != 0 {
-			body["seed"] = req.Seed
-		}
-		jb, _ := json.Marshal(body)
-		url := fmt.Sprintf("http://127.0.0.1:%d/completion", port)
-		httpReq, _ := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(jb))
-		httpReq.Header.Set("Content-Type", "application/json")
-		resp, err := http.DefaultClient.Do(httpReq)
-		if err != nil {
-			return err
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode/100 != 2 {
-			b, _ := io.ReadAll(resp.Body)
-			return fmt.Errorf("llama-server status %d: %s", resp.StatusCode, string(b))
-		}
-		// Stream lines; handle both raw NDJSON and SSE 'data: ' prefixed lines.
-		scanner := bufio.NewScanner(resp.Body)
-		scanner.Buffer(make([]byte, 0, 64*1024), 2*1024*1024)
-		var contentBuilder strings.Builder
-		finishReason := "stop"
-		for scanner.Scan() {
-			line := scanner.Text()
-			if line == "" {
-				continue
-			}
-			if strings.HasPrefix(line, "data:") {
-				line = strings.TrimSpace(strings.TrimPrefix(line, "data:"))
-			}
-			if line == "[DONE]" {
-				break
-			}
-			var chunk map[string]any
-			if err := json.Unmarshal([]byte(line), &chunk); err != nil {
-				// If not JSON, skip silently
-				continue
-			}
-			// Try multiple fields where token may appear
-			tok := ""
-			if v, ok := chunk["token"].(string); ok {
-				tok = v
-			} else if v, ok := chunk["content"].(string); ok {
-				tok = v
-			} else if v, ok := chunk["completion"].(string); ok {
-				// Some servers send cumulative completion; diffing is complex. Emit as-is.
-				tok = v
-			}
-			if tok != "" {
-				contentBuilder.WriteString(tok)
-				if _, err := io.WriteString(w, tokenLine(tok)); err != nil {
-					return err
-				}
-				if flusher != nil {
-					flusher()
-				}
-			}
-			// Detect stop conditions
-			if v, ok := chunk["stop"].(bool); ok && v {
-				if fr, ok2 := chunk["finish_reason"].(string); ok2 && fr != "" {
-					finishReason = fr
-				}
-				break
-			}
-		}
-		// Emit final line
-		end := map[string]any{
-			"done":          true,
-			"content":       contentBuilder.String(),
-			"finish_reason": finishReason,
-			"usage": map[string]int{
-				"prompt_tokens":     0,
-				"completion_tokens": 0,
-				"total_tokens":      0,
-			},
-		}
-		endb, _ := json.Marshal(end)
-		if _, err := w.Write(append(endb, '\n')); err != nil {
-			return err
-		}
-		if flusher != nil {
-			flusher()
-		}
-		return nil
+		// If real inference is enabled but no adapter is configured, report dependency error.
+		return ErrDependencyUnavailable("llama adapter not initialized")
 	}
 
 	// Fallback placeholder (legacy behavior)

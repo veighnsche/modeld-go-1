@@ -53,6 +53,10 @@ func NewWithConfig(cfg ManagerConfig) *Manager {
 	m.LlamaBin = cfg.LlamaBin
 	m.LlamaCtx = cfg.LlamaCtx
 	m.LlamaThreads = cfg.LlamaThreads
+	// Initialize in-process llama adapter when real inference is enabled.
+	if m.RealInferEnabled {
+		m.adapter = NewLlamaAdapter(m.LlamaCtx, m.LlamaThreads)
+	}
 	m.startTime = time.Now()
 	return m
 }

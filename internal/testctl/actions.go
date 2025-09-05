@@ -8,6 +8,7 @@ var (
 	fnInstallPy         = installPy
 	fnInstallHostDocker = installHostDocker
 	fnInstallHostAct    = installHostAct
+	fnInstallLlamaCUDA  = installLlamaCUDA
 
 	fnRunGoTests = runGoTests
 	fnRunPyTests = runPyTests

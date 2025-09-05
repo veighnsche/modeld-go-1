@@ -16,7 +16,7 @@ func usage() {
 	fmt.Println("Usage: testctl [--web-port N] [--log-level info] <command>")
 	fmt.Println()
 	fmt.Println("Commands:")
-	fmt.Println("  install all|js|go|py|host:docker|host:act|host:all")
+	fmt.Println("  install all|js|go|py|llama|llama:cuda|go-llama.cpp|go-llama.cpp:cuda|host:docker|host:act|host:all")
 	fmt.Println("  test go")
 	fmt.Println("  test api:py")
 	fmt.Println("  test py:haiku")
@@ -32,7 +32,7 @@ func Run(args []string, cfg *Config) error {
 	switch args[0] {
 	case "install":
 		if len(args) < 2 {
-			return fmt.Errorf("install requires a subcommand: all|js|go|py|host:docker|host:act|host:all")
+			return fmt.Errorf("install requires a subcommand: all|js|go|py|llama|llama:cuda|host:docker|host:act|host:all")
 		}
 		switch args[1] {
 		case "all":
@@ -64,6 +64,8 @@ func Run(args []string, cfg *Config) error {
 			return fnInstallGo()
 		case "py":
 			return fnInstallPy()
+		case "llama", "llama:cuda", "go-llama.cpp", "go-llama.cpp:cuda":
+			return fnInstallLlamaCUDA()
 		default:
 			return fmt.Errorf("unknown install subcommand: %s", args[1])
 		}
