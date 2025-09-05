@@ -38,6 +38,8 @@ type Instance struct {
 	queueCh chan struct{} // buffered: queue slots
 	// Runtime endpoint info (when inference via external runtime is enabled)
 	Port int
+	// Process ID when using subprocess-managed runtime
+	PID  int
 	// Process handle for managed runtime (e.g., llama-server)
 	Proc interface{}
 }

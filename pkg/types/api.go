@@ -67,6 +67,12 @@ type InstanceStatus struct {
 	// Maximum queued requests allowed before backpressure triggers.
 	// example: 32
 	MaxQueueDepth int `json:"max_queue_depth" example:"32"`
+	// TCP port used by the managed runtime (when spawn mode is active).
+	// example: 30001
+	Port int `json:"port,omitempty" example:"30001"`
+	// Process ID of the managed runtime (when spawn mode is active).
+	// example: 12345
+	PID int `json:"pid,omitempty" example:"12345"`
 }
 
 // StatusResponse is returned by GET /status.

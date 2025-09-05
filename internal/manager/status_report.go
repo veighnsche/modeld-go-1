@@ -31,6 +31,8 @@ func (m *Manager) Status() types.StatusResponse {
 			QueueLen:      len(inst.queueCh),
 			Inflight:      len(inst.genCh),
 			MaxQueueDepth: cap(inst.queueCh),
+			Port:          inst.Port,
+			PID:           inst.PID,
 		})
 	}
 	return resp

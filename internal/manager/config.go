@@ -26,6 +26,16 @@ type ManagerConfig struct {
 	LlamaRequestTimeout time.Duration
 	LlamaConnectTimeout time.Duration
 	LlamaUseOpenAI      bool
+	// Subprocess-managed llama.cpp (spawn mode)
+	SpawnLlama     bool
+	LlamaBin       string
+	LlamaHost      string
+	LlamaPortStart int
+	LlamaPortEnd   int
+	LlamaThreads   int
+	LlamaCtxSize   int
+	LlamaNGL       int
+	LlamaExtraArgs []string
 }
 
 // NewWithConfig constructs a Manager from ManagerConfig.
@@ -49,8 +59,10 @@ func NewWithConfig(cfg ManagerConfig) *Manager {
 	} else {
 		m.maxWait = cfg.MaxWait
 	}
-	// HTTP server adapter (preferred) if URL is provided
-	if cfg.LlamaServerURL != "" {
+	// Adapter selection
+	if cfg.SpawnLlama && cfg.LlamaBin != "" {
+		m.adapter = NewLlamaSubprocessAdapter(cfg)
+	} else if cfg.LlamaServerURL != "" {
 		m.adapter = NewLlamaServerAdapter(
 			cfg.LlamaServerURL,
 			cfg.LlamaAPIKey,

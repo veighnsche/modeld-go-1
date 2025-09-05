@@ -2,6 +2,9 @@ package manager
 
 import (
 	"context"
+	"net"
+	"net/url"
+	"strconv"
 	"time"
 )
 
@@ -74,9 +77,31 @@ func (m *Manager) EnsureInstance(ctx context.Context, modelID string) error {
 	}
 	m.mu.Unlock()
 
-	// Warmup (no external processes). In real mode, the adapter will lazily
-	// load the model on first use if needed; we keep a short warmup to
-	// preserve readiness transitions.
+	// If using subprocess adapter, proactively spawn the runtime so readiness transitions reflect real state.
+	if sa, ok := m.adapter.(*llamaSubprocessAdapter); ok {
+		if _, err := sa.ensureProcess(mdl.Path); err != nil {
+			m.mu.Lock()
+			m.state = StateError
+			m.err = err.Error()
+			m.mu.Unlock()
+			return err
+		}
+		// Record port and PID on instance for status visibility
+		if p := sa.procs[mdl.Path]; p != nil {
+			if u, err := url.Parse(p.baseURL); err == nil {
+				if _, portStr, err2 := net.SplitHostPort(u.Host); err2 == nil {
+					if portNum, e := strconv.Atoi(portStr); e == nil {
+						m.mu.Lock()
+						inst.Port = portNum
+						inst.PID = p.pid
+						m.mu.Unlock()
+					}
+				}
+			}
+		}
+	}
+
+	// Warmup sleep to preserve readiness transitions.
 	select {
 	case <-time.After(50 * time.Millisecond):
 	case <-ctx.Done():

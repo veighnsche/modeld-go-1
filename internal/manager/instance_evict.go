@@ -24,11 +24,20 @@ func (m *Manager) evictUntilFits(requiredMB int) error {
 			}
 		}
 		if lru == nil {
-			// nothing to evict
+			// nothing to evict; still does not fit -> fail fast
 			m.mu.Unlock()
-			return nil
+			return ErrDependencyUnavailable("vram budget exceeded: cannot fit required model instance")
 		}
-		// Evict it: runtime management is handled by in-process adapter; no external process to stop
+		// Evict it: if using subprocess adapter, stop the spawned llama-server.
+		if sa, ok := m.adapter.(*llamaSubprocessAdapter); ok {
+			// Resolve model path from ID
+			mdl, ok := m.getModelByID(lru.ID)
+			m.mu.Unlock()
+			if ok {
+				_ = sa.Stop(mdl.Path)
+			}
+			m.mu.Lock()
+		}
 		delete(m.instances, lru.ID)
 		m.usedEstMB -= lru.EstVRAMMB
 		m.mu.Unlock()

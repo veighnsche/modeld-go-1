@@ -36,6 +36,17 @@ type Manager struct {
 	adapter InferenceAdapter
 }
 
+// StopAllInstances stops all managed runtime subprocesses (spawn mode).
+// It is safe to call multiple times.
+func (m *Manager) StopAllInstances() {
+    m.mu.RLock()
+    ad := m.adapter
+    m.mu.RUnlock()
+    if sa, ok := ad.(*llamaSubprocessAdapter); ok {
+        sa.StopAll()
+    }
+}
+
 func New(reg []types.Model, budgetMB, marginMB int, defaultModel string) *Manager {
 	// Delegate to NewWithConfig to centralize defaults and option parsing
 	return NewWithConfig(ManagerConfig{

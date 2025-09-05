@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -46,12 +47,20 @@ func main() {
 	corsMethods := flag.String("cors-methods", "", "Comma-separated list of allowed CORS methods")
 	corsHeaders := flag.String("cors-headers", "", "Comma-separated list of allowed CORS request headers")
 	// Inference / llama.cpp server (preferred)
-	// Inference / llama.cpp server (preferred)
 	llamaURL := flag.String("llama-url", "", "Base URL for llama.cpp server, e.g., http://127.0.0.1:8081")
 	llamaAPIKey := flag.String("llama-api-key", "", "Bearer API key for llama.cpp server (optional)")
 	llamaReqTimeout := flag.Duration("llama-timeout", 30*time.Second, "Per-request timeout for llama server requests")
 	llamaConnTimeout := flag.Duration("llama-connect-timeout", 5*time.Second, "TCP connect timeout for llama server")
 	llamaUseOpenAI := flag.Bool("llama-use-openai", true, "Use OpenAI-compatible endpoints when talking to llama server")
+	// Subprocess-managed llama.cpp (spawn mode)
+	spawnLlama := flag.Bool("spawn-llama", false, "Spawn and manage llama.cpp subprocesses per model")
+	llamaBin := flag.String("llama-bin", "", "Path to llama-server binary when using --spawn-llama")
+	llamaHost := flag.String("llama-host", "127.0.0.1", "Host to bind spawned llama-server instances")
+	llamaThreads := flag.Int("llama-threads", 0, "Threads for spawned llama-server (-t)")
+	llamaCtx := flag.Int("llama-ctx", 0, "Context size for spawned llama-server (-c)")
+	llamaNGL := flag.Int("llama-ngl", 0, "NGL (GPU layers) for spawned llama-server (-ngl)")
+	llamaPortRange := flag.String("llama-port-range", "", "Port range for spawned llama-server processes, e.g., 30000-30100")
+
 	flag.Parse()
 
 	// Determine which flags were explicitly set to give CLI precedence over config file
@@ -158,6 +167,20 @@ func main() {
 		log.Printf("no --default-model provided; using first discovered model: %s", *defaultModel)
 	}
 	// Use ManagerConfig to pass backpressure knobs
+	// Parse port range if provided
+	var portStart, portEnd int
+	if *llamaPortRange != "" {
+		ps := strings.SplitN(strings.TrimSpace(*llamaPortRange), "-", 2)
+		if len(ps) == 2 {
+			if v, err := strconv.Atoi(strings.TrimSpace(ps[0])); err == nil {
+				portStart = v
+			}
+			if v, err := strconv.Atoi(strings.TrimSpace(ps[1])); err == nil {
+				portEnd = v
+			}
+		}
+	}
+
 	mgr := manager.NewWithConfig(manager.ManagerConfig{
 		Registry:      reg,
 		BudgetMB:      *vramBudgetMB,
@@ -171,6 +194,15 @@ func main() {
 		LlamaRequestTimeout: *llamaReqTimeout,
 		LlamaConnectTimeout: *llamaConnTimeout,
 		LlamaUseOpenAI:      *llamaUseOpenAI,
+		// Spawn adapter config
+		SpawnLlama:     *spawnLlama,
+		LlamaBin:       *llamaBin,
+		LlamaHost:      *llamaHost,
+		LlamaPortStart: portStart,
+		LlamaPortEnd:   portEnd,
+		LlamaThreads:   *llamaThreads,
+		LlamaCtxSize:   *llamaCtx,
+		LlamaNGL:       *llamaNGL,
 	})
 
 	// Preflight: validate adapter presence and default model path.
@@ -258,6 +290,8 @@ func main() {
 	<-stop
 	// Cancel base context to stop in-flight handler work
 	baseCancel()
+	// Stop spawned runtimes (best-effort)
+	mgr.StopAllInstances()
 	ctx, cancel := context.WithTimeout(context.Background(), *shutdownTimeout)
 	defer cancel()
 	if err := srv.Shutdown(ctx); err != nil {
