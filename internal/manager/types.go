@@ -27,14 +27,6 @@ type Snapshot struct {
 	Err          string
 }
 
-// Adapter represents a model runtime. This is a placeholder for future
-// integration and allows the Instance to hold a reference without dictating
-// a concrete implementation yet.
-type Adapter interface {
-	// Close releases resources associated with the adapter.
-	Close() error
-}
-
 // Instance represents a live model context (one per model id).
 type Instance struct {
 	ID        string
@@ -44,8 +36,6 @@ type Instance struct {
 	// Queueing primitives
 	genCh   chan struct{} // size 1: single in-flight generation
 	queueCh chan struct{} // buffered: queue slots
-	// Adapter backing this instance (placeholder for real model runtime)
-	Adapter Adapter
 	// Runtime endpoint info (when real inference is enabled)
 	Port int
 	// Process handle for managed runtime (e.g., llama-server)

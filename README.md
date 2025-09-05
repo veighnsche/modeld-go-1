@@ -23,6 +23,49 @@ A lightweight control-plane service (Go 1.23+) to manage multiple preloaded llam
 - Build & Run the API: see [docs/build-and-run.md](docs/build-and-run.md)
 - API reference (Swagger): see [docs/api.md](docs/api.md)
 
+## Build modes and llama.cpp runtime
+
+There are two build modes. The default is a no-CGO stub for fast development and CI. The real in‑process llama runtime is available via build tags.
+
+- Stub (default, no CGO):
+  - No native dependencies. Useful for API/dev/CI.
+  - Files: `internal/manager/adapter_llama_stub.go`.
+
+- In‑process llama (real, CGO):
+  - Enabled with: `-tags=llama`.
+  - Uses `github.com/go-skynet/go-llama.cpp` to run models in‑process.
+  - Files: `internal/manager/adapter_llama.go`, `internal/manager/llama_cgo.go`.
+
+Notes
+
+- External `llama_server` process mode has been removed. All real inference goes through the in‑process go‑llama.cpp adapter.
+- `llama_cgo.go` sets an rpath of `$ORIGIN` so the loader can find `libllama.so` next to your built binary, if you place it there.
+
+### Enabling in‑process llama
+
+1) Build with the llama tag:
+
+```bash
+go build -tags=llama ./cmd/modeld
+```
+
+2) Provide a config that enables real inference and sets llama parameters (example snippet):
+
+```go
+mgr := manager.NewWithConfig(manager.ManagerConfig{
+    Registry: []types.Model{{ID: "tinyllama-q4", Path: "/path/to/model.gguf"}},
+    DefaultModel:     "tinyllama-q4",
+    RealInferEnabled: true,
+    LlamaCtx:         4096,
+    LlamaThreads:     8,
+})
+```
+
+3) Ensure the native llama library is discoverable at runtime. Options:
+
+- Place `libllama.so` next to the built binary (benefits from `$ORIGIN` rpath set by `llama_cgo.go`).
+- Or install it in a system path that the dynamic loader uses.
+
 ## API Cheat Sheet
 
 Base URL examples:
@@ -106,10 +149,57 @@ Error responses (JSON):
 - Deployment (systemd): [docs/deployment.md](docs/deployment.md)
 - Metrics: [docs/metrics.md](docs/metrics.md)
 
+## Internal manager ergonomics
+
+The orchestration layer lives in `internal/manager/`.
+
+- Core types and config: `manager.go`, `types.go`, `config.go`
+- Inference entry point: `inference.go`
+- Instance lifecycle: `instance_ensure.go`, `instance_evict.go`
+- Queueing: `queue_admission.go`
+- Status: `status_report.go`
+- Ops/demo: `ops_switch.go`
+- Adapter interface: `adapter_iface.go`
+- Llama adapters:
+  - Real (tagged `llama`): `adapter_llama.go`, plus link hints in `llama_cgo.go`
+  - Stub (no tag): `adapter_llama_stub.go`
+
+Design goals:
+
+- Single abstraction for runtimes via `InferenceAdapter`.
+- No external `llama_server` processes; all real inference is in‑process via go‑llama.cpp.
+- Keep package concerns small and discoverable by file naming.
+
 - No authentication, quotas, or rate limits yet
 - Basic FIFO per-model queues only
 - SSE/WebSocket eventing may be added later; current streaming is NDJSON
 - Metrics/tracing to be added later
+
+## FAQ
+
+- __How do I enable real in‑process llama?__
+  Build with `-tags=llama` and set `RealInferEnabled: true` in `manager.ManagerConfig`. Also set `LlamaCtx` and `LlamaThreads` as needed.
+
+- __I get "cannot find -lllama" or runtime loader errors about `libllama.so`. What do I do?__
+  Ensure the native llama library is available to the dynamic loader. Easiest is to place `libllama.so` next to your built binary; `internal/manager/llama_cgo.go` sets rpath `$ORIGIN` so the loader finds it there. Alternatively, install it in a system library path.
+
+- __Do I need an external `llama_server` process?__
+  No. External server mode was removed. All real inference is handled in‑process via `go-skynet/go-llama.cpp`.
+
+- __Builds succeed but inference returns a dependency error.__
+  Make sure you built with `-tags=llama` and initialized the manager with `RealInferEnabled: true`. Without the tag, the stub adapter is used (no CGO) and real inference is disabled.
+
+- __How do I configure the default model?__
+  Provide your registry via `manager.ManagerConfig.Registry` and set `DefaultModel` to the desired model ID. The `Path` field must point to a valid `.gguf` file.
+
+- __How does streaming work?__
+  `POST /infer` streams NDJSON lines. For the real adapter, tokens are forwarded as they are generated. A final line includes `done: true` and simple usage info.
+
+- __How is VRAM usage enforced?__
+  The manager estimates model size from the file size (MB) and evicts least‑recently‑used idle instances when `BudgetMB` would be exceeded (plus `MarginMB`). See `internal/manager/instance_evict.go`.
+
+- __Can I run tests without CGO?__
+  Yes. By default (without `-tags=llama`) the stub adapter builds and all manager tests run with no native dependencies.
 
 ## License
 

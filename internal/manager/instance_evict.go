@@ -28,10 +28,7 @@ func (m *Manager) evictUntilFits(requiredMB int) error {
 			m.mu.Unlock()
 			return nil
 		}
-		// Evict it: best-effort stop runtime first
-		if m.RealInferEnabled {
-			m.stopInstanceRuntime(lru)
-		}
+		// Evict it: runtime management is handled by in-process adapter; no external process to stop
 		delete(m.instances, lru.ID)
 		m.usedEstMB -= lru.EstVRAMMB
 		m.mu.Unlock()

@@ -116,19 +116,6 @@ func (m *Manager) Infer(ctx context.Context, req types.InferRequest, w io.Writer
 	return nil
 }
 
-// isTruthy interprets common truthy values.
-func isTruthy(v string) bool {
-	if v == "" {
-		return false
-	}
-	switch strings.ToLower(strings.TrimSpace(v)) {
-	case "1", "true", "yes", "on":
-		return true
-	default:
-		return false
-	}
-}
-
 // tokenLineJSON formats a token NDJSON line using json.Marshal for correctness.
 func tokenLineJSON(tok string) []byte {
     type tokenMsg struct {

@@ -13,7 +13,20 @@
 //   - status.go: Status/Snapshot reporting helpers.
 //   - ops.go: operational stubs like Switch.
 //
+// Build tags and runtimes:
+//
+//   - In-process llama (standard):
+//       Uses go-llama.cpp adapter. Enabled with `-tags=llama`.
+//       Files: adapter_llamacpp_llama.go, llama_cgo.go (linker rpath hints).
+//       A no-CGO stub exists when the tag is not set: adapter_llamacpp.go.
+//
+//   - External llama_server: DISABLED
+//       We standardized on the in-process adapter. The previous llama_server
+//       integration is retained only for reference and is excluded from builds.
+//       Files excluded via `//go:build ignore`: runtime_llama.go, runtime_llama_stub.go.
+//
 // External packages should treat this package as the orchestration layer and use
 // public methods only (e.g., New/NewWithConfig, Ready, ListModels, Status, Infer).
 // Internal types are subject to change.
 package manager
+
