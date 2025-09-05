@@ -85,10 +85,10 @@ func testWebHaikuHost(cfg *Config) error {
         return err
     }
 
-    // Run Cypress headless for only the haiku spec, exporting API urls for optional checks
+    // Run Cypress headless for only the haiku spec (centered), exporting API urls for optional checks
     return runEnvCmdStreaming(context.Background(), map[string]string{
         "CYPRESS_BASE_URL":       fmt.Sprintf("http://localhost:%d", webPort),
         "CYPRESS_API_READY_URL":  fmt.Sprintf("http://localhost:%d/readyz", apiPort),
         "CYPRESS_API_STATUS_URL": fmt.Sprintf("http://localhost:%d/status", apiPort),
-    }, "pnpm", "run", "test:e2e:run", "--", "--spec", "e2e/specs/haiku_maker.cy.ts")
+    }, "xvfb-run", "-a", "pnpm", "exec", "cypress", "run", "--config-file", "e2e/cypress.config.ts", "--spec", "e2e/specs/haiku_center.cy.ts")
 }

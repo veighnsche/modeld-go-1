@@ -57,7 +57,7 @@ describe('Live API - real infer + status', () => {
     cy.get('[data-testid="submit-btn"]').click()
 
     // 4) Expect success with a generous timeout for real LLMs
-    cy.get('[data-testid="status"]', { timeout: 60000 }).should('have.text', 'success')
+    cy.get('[data-testid="status"]', { timeout: 20000 }).should('have.text', 'success')
 
     // 5) Result JSON should contain some meaningful content
     cy.get('[data-testid="result-json"]').invoke('text').then((text) => {

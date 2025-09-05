@@ -206,6 +206,21 @@ func postInfer(svc Service) http.HandlerFunc {
 				}
 				return
 			}
+			if manager.IsDependencyUnavailable(err) {
+				writeJSONError(w, http.StatusServiceUnavailable, err.Error())
+				if lvl >= LevelInfo {
+					if zlog != nil {
+						z := zlog.Info().Str("status", "503").Dur("dur", time.Since(start))
+						if rid := middleware.GetReqID(r.Context()); rid != "" {
+							z = z.Str("request_id", rid)
+						}
+						z.Err(err).Msg("infer end")
+					} else {
+						log.Printf("infer end status=503 dur=%s err=%v", time.Since(start), err)
+					}
+				}
+				return
+			}
 			if manager.IsTooBusy(err) {
 				writeJSONError(w, http.StatusTooManyRequests, err.Error())
 				IncrementBackpressure("queue")

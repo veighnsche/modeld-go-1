@@ -73,6 +73,10 @@ export default function InferPage() {
     const body: any = { prompt }
     if (model.trim()) body.model = model.trim()
     if (SEND_STREAM_FIELD) body.stream = true
+    // Provide sane defaults to align with backend expectations
+    body.max_tokens = 128
+    body.temperature = 0.7
+    body.top_p = 0.95
 
     try {
       const res = await fetch(fullUrl(PATHS.infer), {

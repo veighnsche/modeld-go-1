@@ -2,6 +2,7 @@ import React, { Suspense, lazy } from 'react'
 import { Link, Navigate, Route, Routes } from 'react-router-dom'
 import InferPage from './pages/InferPage'
 import HealthPage from './pages/HealthPage'
+import HaikuPage from './pages/HaikuPage'
 const ReadyPage = lazy(() => import('./pages/ReadyPage'))
 const ModelsPage = lazy(() => import('./pages/ModelsPage'))
 const StatusPage = lazy(() => import('./pages/StatusPage'))
@@ -12,6 +13,7 @@ export default function App() {
       <header style={{ marginBottom: 12 }}>
         <nav style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <Link to="/">Infer</Link>
+          <Link to="/haiku">Haiku</Link>
           <Link to="/health">Health</Link>
           <Link to="/ready">Ready</Link>
           <Link to="/models">Models</Link>
@@ -23,6 +25,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<InferPage />} />
             <Route path="/infer" element={<Navigate to="/" replace />} />
+            <Route path="/haiku" element={<HaikuPage />} />
             <Route path="/health" element={<HealthPage />} />
             <Route path="/ready" element={<ReadyPage />} />
             <Route path="/models" element={<ModelsPage />} />

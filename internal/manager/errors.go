@@ -23,3 +23,18 @@ func IsModelNotFound(err error) bool {
 	_, ok := err.(modelNotFoundError)
 	return ok
 }
+
+// dependencyUnavailableError signals a missing external dependency (e.g., llama.cpp)
+// so the HTTP layer can return 503 Service Unavailable instead of 500.
+type dependencyUnavailableError struct{ msg string }
+
+func (e dependencyUnavailableError) Error() string { return e.msg }
+
+// ErrDependencyUnavailable constructs a dependencyUnavailableError.
+func ErrDependencyUnavailable(msg string) error { return dependencyUnavailableError{msg: msg} }
+
+// IsDependencyUnavailable reports whether err indicates a missing/failed runtime dependency.
+func IsDependencyUnavailable(err error) bool {
+	_, ok := err.(dependencyUnavailableError)
+	return ok
+}

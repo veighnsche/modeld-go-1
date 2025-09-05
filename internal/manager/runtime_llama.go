@@ -30,8 +30,16 @@ func (m *Manager) ensureLlamaRuntime(ctx context.Context, inst *Instance, mdl ty
 		}
 		// else fall through to restart
 	}
-	if strings.TrimSpace(m.LlamaBin) == "" {
-		return errors.New("llama binary path is not configured")
+	// Resolve llama-server binary (auto-discover if not provided)
+	bin := strings.TrimSpace(m.LlamaBin)
+	if bin == "" {
+		bin = discoverLlamaBin()
+	}
+	if bin == "" {
+		return ErrDependencyUnavailable("llama-server not found: set --llama-bin or install llama.cpp")
+	}
+	if fi, err := os.Stat(bin); err != nil || fi.IsDir() {
+		return ErrDependencyUnavailable(fmt.Sprintf("llama-server not found or not a file: %s", bin))
 	}
 	modelPath := strings.TrimSpace(mdl.Path)
 	if modelPath == "" {
@@ -71,7 +79,6 @@ func (m *Manager) stopInstanceRuntime(inst *Instance) {
 // startLlamaServer launches the llama-server process.
 func (m *Manager) startLlamaServer(ctx context.Context, port int, modelPath string) (*os.Process, error) {
 	args := []string{
-		"--server",
 		"--host", "127.0.0.1",
 		"--port", fmt.Sprintf("%d", port),
 		"-m", modelPath,
@@ -82,7 +89,11 @@ func (m *Manager) startLlamaServer(ctx context.Context, port int, modelPath stri
 	if m.LlamaThreads > 0 {
 		args = append(args, "--threads", fmt.Sprintf("%d", m.LlamaThreads))
 	}
-	cmd := exec.CommandContext(ctx, m.LlamaBin, args...)
+	bin := strings.TrimSpace(m.LlamaBin)
+	if bin == "" {
+		bin = discoverLlamaBin()
+	}
+	cmd := exec.CommandContext(ctx, bin, args...)
 	// Ensure working directory is the model directory so relative assets resolve
 	cmd.Dir = filepath.Dir(modelPath)
 	// Pipe stdout/stderr to help debugging but don't spam logs; keep in-memory reader
@@ -146,4 +157,26 @@ func checkHealth(ctx context.Context, port int) error {
 		return fmt.Errorf("health status %d", resp.StatusCode)
 	}
 	return nil
+}
+
+// discoverLlamaBin attempts to locate a llama.cpp server binary in common paths.
+// This function deliberately avoids environment-variable configuration to keep
+// the server deterministic; callers should pass --llama-bin to override.
+func discoverLlamaBin() string {
+    home, _ := os.UserHomeDir()
+    candidates := []string{
+        filepath.Join(home, "apps", "llama.cpp", "build", "bin", "llama-server"),
+        filepath.Join(home, ".local", "share", "Jan", "data", "llamacpp", "backends", "b6293", "linux-avx2-cuda-cu12.0-x64", "build", "bin", "llama-server"),
+        "/usr/local/bin/llama-server",
+        "/opt/homebrew/bin/llama-server",
+    }
+    for _, p := range candidates {
+        if fi, err := os.Stat(p); err == nil && !fi.IsDir() {
+            return p
+        }
+    }
+    if lp, err := exec.LookPath("llama-server"); err == nil {
+        return lp
+    }
+    return ""
 }

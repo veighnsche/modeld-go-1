@@ -62,7 +62,7 @@ describe('Haiku Maker - live web harness', () => {
     cy.get('[data-testid="submit-btn"]').click()
 
     // 4) Expect success with a generous timeout for real LLMs. DO NOT MOCK THE HAIKU FOR TESTING!!!
-    cy.get('[data-testid="status"]', { timeout: 90000 }).should('have.text', 'success')
+    cy.get('[data-testid="status"]', { timeout: 20000 }).should('have.text', 'success')
 
     // 5) Basic validations that we actually received output from the real backend.
     // Avoid strict shape assertions as implementations may vary. DO NOT MOCK THE HAIKU FOR TESTING!!!
