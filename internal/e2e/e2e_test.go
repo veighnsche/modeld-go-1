@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -35,16 +38,16 @@ func TestE2E_Config_CORS_And_InferTimeout(t *testing.T) {
 	if err != nil {
 		t.Fatalf("preflight err: %v", err)
 	}
-	_ = resp.Body.Close()
-	if ao := resp.Header.Get("Access-Control-Allow-Origin"); ao == "" {
-		t.Fatalf("expected CORS allow origin header, got none")
-	}
+    _ = resp.Body.Close()
+    if ao := resp.Header.Get("Access-Control-Allow-Origin"); ao == "" {
+        t.Fatalf("expected CORS allow origin header, got none")
+    }
 
-	// Normal infer should still succeed
-	r, body := httpPostJSON(t, srv.URL+"/infer", []byte(`{"prompt":"hello"}`))
-	if r.StatusCode != http.StatusOK {
-		t.Fatalf("infer status=%d body=%s", r.StatusCode, string(body))
-	}
+    // Normal infer should still succeed
+    r, body := httpPostJSON(t, srv.URL+"/infer", []byte(`{"prompt":"hello"}`))
+    if r.StatusCode != http.StatusOK {
+        t.Fatalf("infer status=%d body=%s", r.StatusCode, string(body))
+    }
 }
 
 // TestE2E_Backpressure429 verifies we return 429 Too Many Requests when the per-instance
@@ -193,4 +196,80 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// TestE2E_RealHaiku_IfLlamaAvailable exercises a real LLM end-to-end flow without mocks.
+// It will be skipped unless the environment variable LLAMA_URL is set to a reachable
+// llama.cpp server (OpenAI-compatible /v1/completions). Optionally, LLAMA_API_KEY can be
+// set for authentication.
+func TestE2E_RealHaiku_IfLlamaAvailable(t *testing.T) {
+    llamaURL := strings.TrimSpace(os.Getenv("LLAMA_URL"))
+    if llamaURL == "" {
+        t.Skip("LLAMA_URL not set; skipping real haiku e2e test")
+    }
+    // Prepare a minimal registry with a placeholder model file; the adapter uses server mode.
+    dir, models := createTempModelsDir(t, "placeholder.gguf")
+
+    cfg := manager.ManagerConfig{
+        BudgetMB:            0,
+        MarginMB:            0,
+        DefaultModel:        models[0],
+        MaxQueueDepth:       2,
+        MaxWait:             10 * time.Second,
+        LlamaServerURL:      llamaURL,
+        LlamaAPIKey:         os.Getenv("LLAMA_API_KEY"),
+        LlamaRequestTimeout: 30 * time.Second,
+        LlamaConnectTimeout: 5 * time.Second,
+        LlamaUseOpenAI:      true,
+    }
+    srv, _ := newServerForDirWithConfig(t, dir, cfg)
+
+    // Quick health check
+    if r, _ := httpGet(t, srv.URL+"/healthz"); r.StatusCode != http.StatusOK {
+        t.Skipf("server not healthy; status=%d", r.StatusCode)
+    }
+
+    // Ask for a haiku and stream NDJSON
+    prompt := "Write a 3-line haiku about the ocean."
+    resp, body := httpPostJSON(t, srv.URL+"/infer", []byte(fmt.Sprintf(`{"prompt":%q,"max_tokens":128,"temperature":0.7,"top_p":0.95}`, prompt)))
+    if resp.StatusCode != http.StatusOK {
+        t.Fatalf("/infer status=%d body=%s", resp.StatusCode, string(body))
+    }
+    // Parse NDJSON lines and extract tokens/final content
+    lines := strings.Split(string(body), "\n")
+    var tokens []string
+    var finalContent string
+    for _, ln := range lines {
+        s := strings.TrimSpace(ln)
+        if s == "" {
+            continue
+        }
+        var obj map[string]any
+        if err := json.Unmarshal([]byte(s), &obj); err != nil {
+            continue
+        }
+        if tok, ok := obj["token"].(string); ok && tok != "" {
+            tokens = append(tokens, tok)
+        }
+        if done, _ := obj["done"].(bool); done {
+            if c, ok := obj["content"].(string); ok {
+                finalContent = c
+            }
+        }
+    }
+    content := strings.TrimSpace(func() string {
+        if finalContent != "" {
+            return finalContent
+        }
+        return strings.Join(tokens, "")
+    }())
+    // Print the haiku to test logs as proof of generation
+    if content != "" {
+        t.Logf("\n----- GENERATED HAIKU -----\n%s\n---------------------------\n", content)
+        // Duplicate to stdout for environments that do not show t.Log without -v
+        fmt.Printf("\n----- GENERATED HAIKU -----\n%s\n---------------------------\n", content)
+    }
+    if content == "" {
+        t.Fatalf("expected non-empty haiku content")
+    }
 }
