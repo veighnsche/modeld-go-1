@@ -8,7 +8,8 @@ WEB_PORT ?= 5173
 
 .PHONY: build run tidy clean test cover cover-html cover-check e2e-py \
         swagger-install swagger-gen swagger-build swagger-run \
-        web-build web-preview web-dev e2e-cy-mock e2e-cy-live
+        web-build web-preview web-dev e2e-cy-mock e2e-cy-live \
+        test-all
 
 build:
 	@mkdir -p bin
@@ -72,6 +73,9 @@ install-golangci-lint:
 lint:
 	@command -v golangci-lint >/dev/null 2>&1 || { echo "golangci-lint not found; run 'make install-golangci-lint'" >&2; exit 1; }
 	@golangci-lint run
+
+test-all:
+	@bash scripts/test-all.sh
 
 # Web (Vite + React)
 web-build:

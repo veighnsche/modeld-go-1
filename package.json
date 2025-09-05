@@ -17,6 +17,7 @@
     "e2e:mock": "pnpm run web:build && pnpm run web:preview & node scripts/poll-url.js http://localhost:5173 200 60 && CYPRESS_BASE_URL=http://localhost:5173 CYPRESS_USE_MOCKS=1 pnpm run test:e2e:run",
     "e2e:live": "pnpm run web:build && pnpm run web:preview & node scripts/poll-url.js http://localhost:5173 200 60 && CYPRESS_BASE_URL=http://localhost:5173 CYPRESS_USE_MOCKS=0 pnpm run test:e2e:run",
     "stop:all": "echo 'Implement stopping processes by PID/port if desired'",
+    "test:all": "make test-all",
     "lint": "pnpm exec eslint . --ext .ts,.tsx,.js,.cjs --max-warnings=0",
     "lint:fix": "pnpm exec eslint . --ext .ts,.tsx,.js,.cjs --fix",
     "format": "pnpm exec prettier . --write",
