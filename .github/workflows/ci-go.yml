@@ -155,7 +155,7 @@ jobs:
           CGO_ENABLED: 1
         with:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
-          args: --modules-download-mode=mod --timeout=5m
+          args: --go=1.23 --modules-download-mode=mod --timeout=5m
 
       - name: Run tests with coverage (library packages only)
         run: |
