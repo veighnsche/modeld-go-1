@@ -12,80 +12,80 @@ import (
 
 // fakeAdapter is a lightweight in-memory adapter used for tests.
 type fakeAdapter struct {
-	startErr    error
-	genErr      error
-	tokens      []string
+	startErr   error
+	genErr     error
+	tokens     []string
 	final      FinalResult
 	receivedMP string
 }
 
 func TestInfer_AdapterStartError(t *testing.T) {
-    dir := t.TempDir()
-    p := createModelFile(t, dir, "m.bin", 1)
-    m := NewWithConfig(ManagerConfig{Registry: []types.Model{{ID: "m", Path: p}}, DefaultModel: "m"})
-    m.RealInferEnabled = true
-    m.adapter = &fakeAdapter{startErr: errors.New("boom")}
-    if err := m.EnsureInstance(context.Background(), "m"); err != nil {
-        t.Fatalf("ensure: %v", err)
-    }
-    var buf bytes.Buffer
-    err := m.Infer(context.Background(), types.InferRequest{Model: "m", Prompt: "p", Stream: true}, &buf, nil)
-    if err == nil {
-        t.Fatalf("expected error from Start")
-    }
+	dir := t.TempDir()
+	p := createModelFile(t, dir, "m.bin", 1)
+	m := NewWithConfig(ManagerConfig{Registry: []types.Model{{ID: "m", Path: p}}, DefaultModel: "m"})
+	m.RealInferEnabled = true
+	m.adapter = &fakeAdapter{startErr: errors.New("boom")}
+	if err := m.EnsureInstance(context.Background(), "m"); err != nil {
+		t.Fatalf("ensure: %v", err)
+	}
+	var buf bytes.Buffer
+	err := m.Infer(context.Background(), types.InferRequest{Model: "m", Prompt: "p", Stream: true}, &buf, nil)
+	if err == nil {
+		t.Fatalf("expected error from Start")
+	}
 }
 
 func TestInfer_AdapterGenerateError(t *testing.T) {
-    dir := t.TempDir()
-    p := createModelFile(t, dir, "m.bin", 1)
-    m := NewWithConfig(ManagerConfig{Registry: []types.Model{{ID: "m", Path: p}}, DefaultModel: "m"})
-    m.RealInferEnabled = true
-    m.adapter = &fakeAdapter{tokens: []string{"a"}, genErr: errors.New("gen")}
-    if err := m.EnsureInstance(context.Background(), "m"); err != nil {
-        t.Fatalf("ensure: %v", err)
-    }
-    var buf bytes.Buffer
-    err := m.Infer(context.Background(), types.InferRequest{Model: "m", Prompt: "p", Stream: true}, &buf, nil)
-    if err == nil {
-        t.Fatalf("expected generate error")
-    }
+	dir := t.TempDir()
+	p := createModelFile(t, dir, "m.bin", 1)
+	m := NewWithConfig(ManagerConfig{Registry: []types.Model{{ID: "m", Path: p}}, DefaultModel: "m"})
+	m.RealInferEnabled = true
+	m.adapter = &fakeAdapter{tokens: []string{"a"}, genErr: errors.New("gen")}
+	if err := m.EnsureInstance(context.Background(), "m"); err != nil {
+		t.Fatalf("ensure: %v", err)
+	}
+	var buf bytes.Buffer
+	err := m.Infer(context.Background(), types.InferRequest{Model: "m", Prompt: "p", Stream: true}, &buf, nil)
+	if err == nil {
+		t.Fatalf("expected generate error")
+	}
 }
 
 func TestInfer_RealEnabled_ModelNotFound(t *testing.T) {
-    // Empty registry ensures model not found when specifying unknown model
-    m := NewWithConfig(ManagerConfig{DefaultModel: ""})
-    m.RealInferEnabled = true
-    var buf bytes.Buffer
-    err := m.Infer(context.Background(), types.InferRequest{Model: "missing", Prompt: "p", Stream: true}, &buf, nil)
-    if err == nil || !IsModelNotFound(err) {
-        t.Fatalf("expected model not found, got %v", err)
-    }
+	// Empty registry ensures model not found when specifying unknown model
+	m := NewWithConfig(ManagerConfig{DefaultModel: ""})
+	m.RealInferEnabled = true
+	var buf bytes.Buffer
+	err := m.Infer(context.Background(), types.InferRequest{Model: "missing", Prompt: "p", Stream: true}, &buf, nil)
+	if err == nil || !IsModelNotFound(err) {
+		t.Fatalf("expected model not found, got %v", err)
+	}
 }
 
 type errWriter struct{ wrote int }
 
 func (e *errWriter) Write(p []byte) (int, error) {
-    if e.wrote == 0 {
-        e.wrote += len(p)
-        return len(p), nil
-    }
-    return 0, errors.New("write fail")
+	if e.wrote == 0 {
+		e.wrote += len(p)
+		return len(p), nil
+	}
+	return 0, errors.New("write fail")
 }
 
 func TestInfer_TokenWriteErrorStops(t *testing.T) {
-    dir := t.TempDir()
-    p := createModelFile(t, dir, "m.bin", 1)
-    m := NewWithConfig(ManagerConfig{Registry: []types.Model{{ID: "m", Path: p}}, DefaultModel: "m"})
-    m.RealInferEnabled = true
-    m.adapter = &fakeAdapter{tokens: []string{"a", "b"}}
-    if err := m.EnsureInstance(context.Background(), "m"); err != nil {
-        t.Fatalf("ensure: %v", err)
-    }
-    ew := &errWriter{}
-    err := m.Infer(context.Background(), types.InferRequest{Model: "m", Prompt: "p", Stream: true}, ew, nil)
-    if err == nil {
-        t.Fatalf("expected write error")
-    }
+	dir := t.TempDir()
+	p := createModelFile(t, dir, "m.bin", 1)
+	m := NewWithConfig(ManagerConfig{Registry: []types.Model{{ID: "m", Path: p}}, DefaultModel: "m"})
+	m.RealInferEnabled = true
+	m.adapter = &fakeAdapter{tokens: []string{"a", "b"}}
+	if err := m.EnsureInstance(context.Background(), "m"); err != nil {
+		t.Fatalf("ensure: %v", err)
+	}
+	ew := &errWriter{}
+	err := m.Infer(context.Background(), types.InferRequest{Model: "m", Prompt: "p", Stream: true}, ew, nil)
+	if err == nil {
+		t.Fatalf("expected write error")
+	}
 }
 
 func (f *fakeAdapter) Start(modelPath string, params InferParams) (InferSession, error) {
@@ -186,7 +186,9 @@ func TestTokenLineJSON_EscapesAndNewline(t *testing.T) {
 	if len(b) == 0 || b[len(b)-1] != '\n' {
 		t.Fatalf("expected trailing newline")
 	}
-	var obj struct{ Token string `json:"token"` }
+	var obj struct {
+		Token string `json:"token"`
+	}
 	if err := json.Unmarshal(b[:len(b)-1], &obj); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}

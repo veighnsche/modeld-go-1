@@ -2,9 +2,9 @@ package testctl
 
 import (
 	"fmt"
+	"github.com/spf13/cobra"
 	"os"
 	"strings"
-	"github.com/spf13/cobra"
 )
 
 // buildRootCmd is a convenience for help-only fallbacks.
@@ -13,8 +13,8 @@ func buildRootCmd() *cobra.Command { return buildRootCmdWith(&Config{WebPort: 51
 // buildRootCmdWith constructs a Cobra command tree wired to the existing fn* actions.
 func buildRootCmdWith(cfg *Config) *cobra.Command {
 	root := &cobra.Command{
-		Use:   "testctl",
-		Short: "Test and dev utilities grouped by environment",
+		Use:           "testctl",
+		Short:         "Test and dev utilities grouped by environment",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
@@ -26,10 +26,14 @@ func buildRootCmdWith(cfg *Config) *cobra.Command {
 		if f := cmd.InheritedFlags().Lookup("web-port"); f != nil {
 			var n int
 			_, _ = fmt.Sscanf(f.Value.String(), "%d", &n)
-			if n != 0 { cfg.WebPort = n }
+			if n != 0 {
+				cfg.WebPort = n
+			}
 		}
 		if f := cmd.InheritedFlags().Lookup("log-level"); f != nil {
-			if v := f.Value.String(); v != "" { cfg.LogLvl = v }
+			if v := f.Value.String(); v != "" {
+				cfg.LogLvl = v
+			}
 		}
 		SetLogLevel(cfg.LogLvl)
 	}
@@ -41,8 +45,12 @@ func buildRootCmdWith(cfg *Config) *cobra.Command {
 		return fmt.Errorf("install requires a subcommand: all|nodejs|go|py|llama|llama:cuda|go-llama.cpp|go-llama.cpp:cuda|host:docker|host:act|host:all")
 	}}
 	installAll := &cobra.Command{Use: "all", Short: "Install nodejs, go, py", Example: "  testctl install all", RunE: func(cmd *cobra.Command, args []string) error {
-		if err := fnInstallNodeJS(); err != nil { return err }
-		if err := fnInstallGo(); err != nil { return err }
+		if err := fnInstallNodeJS(); err != nil {
+			return err
+		}
+		if err := fnInstallGo(); err != nil {
+			return err
+		}
 		return fnInstallPy()
 	}}
 	installNode := &cobra.Command{Use: "nodejs", Aliases: []string{"js"}, Short: "Ensure pnpm and install JS deps", Example: "  testctl install nodejs", RunE: func(cmd *cobra.Command, args []string) error { return fnInstallNodeJS() }}
@@ -55,7 +63,9 @@ func buildRootCmdWith(cfg *Config) *cobra.Command {
 	installHostDocker := &cobra.Command{Use: "host:docker", Short: "Install Docker (CI-only)", RunE: func(cmd *cobra.Command, args []string) error { return fnInstallHostDocker() }}
 	installHostAct := &cobra.Command{Use: "host:act", Short: "Install GitHub Actions local runner (CI)", RunE: func(cmd *cobra.Command, args []string) error { return fnInstallHostAct() }}
 	installHostAll := &cobra.Command{Use: "host:all", Short: "Install Docker + act (CI-only)", RunE: func(cmd *cobra.Command, args []string) error {
-		if err := fnInstallHostDocker(); err != nil { return err }
+		if err := fnInstallHostDocker(); err != nil {
+			return err
+		}
 		return fnInstallHostAct()
 	}}
 
@@ -66,7 +76,9 @@ func buildRootCmdWith(cfg *Config) *cobra.Command {
 	verifyHostDocker := &cobra.Command{Use: "host:docker", Short: "Verify Docker installation and service", RunE: func(cmd *cobra.Command, args []string) error { return fnVerifyHostDocker() }}
 	verifyHostAct := &cobra.Command{Use: "host:act", Short: "Verify act installation", RunE: func(cmd *cobra.Command, args []string) error { return fnVerifyHostAct() }}
 	verifyHostAll := &cobra.Command{Use: "host:all", Short: "Verify Docker and act installations", RunE: func(cmd *cobra.Command, args []string) error {
-		if err := fnVerifyHostDocker(); err != nil { return err }
+		if err := fnVerifyHostDocker(); err != nil {
+			return err
+		}
 		return fnVerifyHostAct()
 	}}
 	verifyCmd.AddCommand(verifyHostDocker, verifyHostAct, verifyHostAll)
@@ -104,8 +116,12 @@ func buildRootCmdWith(cfg *Config) *cobra.Command {
 		return fmt.Errorf("test all requires 'auto'")
 	}}
 	testAllAuto := &cobra.Command{Use: "auto", Short: "Go → Python → Web (auto mode)", RunE: func(cmd *cobra.Command, args []string) error {
-		if err := fnRunGoTests(); err != nil { return err }
-		if err := fnRunPyTests(); err != nil { return err }
+		if err := fnRunGoTests(); err != nil {
+			return err
+		}
+		if err := fnRunPyTests(); err != nil {
+			return err
+		}
 		if fnHasHostModels() {
 			info("[testctl] Detected host models, running live:host UI suite")
 			return fnTestWebLiveHost(cfg)
@@ -125,10 +141,16 @@ func buildRootCmdWith(cfg *Config) *cobra.Command {
 		tail := append([]string(nil), args...)
 		var extra []string
 		for i, t := range tail {
-			if t == "--" { extra = tail[i+1:]; tail = tail[:i]; break }
+			if t == "--" {
+				extra = tail[i+1:]
+				tail = tail[:i]
+				break
+			}
 		}
 		if len(tail) >= 1 {
-			if tail[0] == "runner:default" { useCat = false }
+			if tail[0] == "runner:default" {
+				useCat = false
+			}
 		}
 		return fnRunCIAll(useCat, extra)
 	}}
@@ -138,10 +160,16 @@ func buildRootCmdWith(cfg *Config) *cobra.Command {
 		tail := args[1:]
 		var extra []string
 		for i, t := range tail {
-			if t == "--" { extra = tail[i+1:]; tail = tail[:i]; break }
+			if t == "--" {
+				extra = tail[i+1:]
+				tail = tail[:i]
+				break
+			}
 		}
 		if len(tail) >= 1 {
-			if tail[0] == "runner:default" { useCat = false }
+			if tail[0] == "runner:default" {
+				useCat = false
+			}
 		}
 		if !strings.Contains(wf, "/") && !strings.HasPrefix(wf, ".github/workflows/") {
 			wf = ".github/workflows/" + wf

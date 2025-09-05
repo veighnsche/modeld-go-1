@@ -16,7 +16,7 @@ WEB_PORT ?= 5173
 
 build:
 	@mkdir -p bin
-	@go build -o $(BIN) ./cmd/modeld
+	@env -u CGO_LDFLAGS -u CGO_CFLAGS -u LD_LIBRARY_PATH CGO_ENABLED=0 go build -o $(BIN) ./cmd/modeld
 
 run:
 	@go run ./cmd/modeld
@@ -108,7 +108,7 @@ test-all:
 # Build the Go-based test controller CLI
 testctl-build:
 	@mkdir -p bin
-	@go build -o bin/testctl ./cmd/testctl
+	@env -u CGO_LDFLAGS -u CGO_CFLAGS -u LD_LIBRARY_PATH CGO_ENABLED=0 go build -o bin/testctl ./cmd/testctl
 
 # Web (Vite + React)
 web-build:

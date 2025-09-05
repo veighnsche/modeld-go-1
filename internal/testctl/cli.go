@@ -61,19 +61,19 @@ func ParseConfigWith(fs *flag.FlagSet, args []string) (*Config, []string) {
 // MainWithArgs is a testable variant of Main that accepts args explicitly.
 // It returns an exit code (0 for success, non-zero on error).
 func MainWithArgs(args []string) int {
-    cfg := &Config{WebPort: envInt("WEB_PORT", 5173), LogLvl: envStr("TESTCTL_LOG_LEVEL", "info")}
-    cmd := buildRootCmdWith(cfg)
-    if len(args) == 0 {
-        // Match prior behavior: show usage and exit 2 when no args are provided
-        _ = cmd.Help()
-        return 2
-    }
-    cmd.SetArgs(args)
-    if err := cmd.Execute(); err != nil {
-        fmt.Fprintln(os.Stderr, err.Error())
-        return 1
-    }
-    return 0
+	cfg := &Config{WebPort: envInt("WEB_PORT", 5173), LogLvl: envStr("TESTCTL_LOG_LEVEL", "info")}
+	cmd := buildRootCmdWith(cfg)
+	if len(args) == 0 {
+		// Match prior behavior: show usage and exit 2 when no args are provided
+		_ = cmd.Help()
+		return 2
+	}
+	cmd.SetArgs(args)
+	if err := cmd.Execute(); err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+		return 1
+	}
+	return 0
 }
 
 // Main returns an exit code (0 for success, non-zero on error) for use by cmd/testctl.

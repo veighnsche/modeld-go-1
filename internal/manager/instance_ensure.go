@@ -74,18 +74,18 @@ func (m *Manager) EnsureInstance(ctx context.Context, modelID string) error {
 	}
 	m.mu.Unlock()
 
-    // Warmup (no external processes). In real mode, the adapter will lazily
-    // load the model on first use if needed; we keep a short warmup to
-    // preserve readiness transitions.
-    select {
-    case <-time.After(50 * time.Millisecond):
-    case <-ctx.Done():
-        m.mu.Lock()
-        m.state = StateError
-        m.err = ctx.Err().Error()
-        m.mu.Unlock()
-        return ctx.Err()
-    }
+	// Warmup (no external processes). In real mode, the adapter will lazily
+	// load the model on first use if needed; we keep a short warmup to
+	// preserve readiness transitions.
+	select {
+	case <-time.After(50 * time.Millisecond):
+	case <-ctx.Done():
+		m.mu.Lock()
+		m.state = StateError
+		m.err = ctx.Err().Error()
+		m.mu.Unlock()
+		return ctx.Err()
+	}
 
 	// Commit instance as ready after warmup
 	m.mu.Lock()

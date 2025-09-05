@@ -38,6 +38,6 @@ func runPyTestHaiku() error {
 			return err
 		}
 	}
-    // Use -s to disable capture so the haiku (printed by the test) appears in logs
-    return runCmdStreaming(context.Background(), pytest, "-q", "-s", filepath.Join(pyDir, "test_haiku.py"))
+	// Use -s to disable capture so the haiku (printed by the test) appears in logs
+	return runCmdStreaming(context.Background(), pytest, "-q", "-s", filepath.Join(pyDir, "test_haiku.py"))
 }

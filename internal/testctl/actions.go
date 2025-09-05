@@ -10,12 +10,12 @@ var (
 	fnInstallHostAct    = installHostAct
 	fnInstallLlamaCUDA  = installLlamaCUDA
 
-	fnRunGoTests = runGoTests
-	fnRunPyTests = runPyTests
+	fnRunGoTests     = runGoTests
+	fnRunPyTests     = runPyTests
 	fnRunPyTestHaiku = runPyTestHaiku
 
-	fnTestWebMock     = testWebMock
-	fnTestWebLiveHost = testWebLiveHost
+	fnTestWebMock      = testWebMock
+	fnTestWebLiveHost  = testWebLiveHost
 	fnTestWebHaikuHost = testWebHaikuHost
 
 	fnHasHostModels = hasHostModels
@@ -28,8 +28,8 @@ var (
 	fnVerifyHostDocker = verifyHostDocker
 	fnVerifyHostAct    = verifyHostAct
 
-    // CI installer helpers (install + verify)
-    fnRunCIInstallersAll    = runCIInstallersAll
-    fnRunCIInstallersAct    = runCIInstallersAct
-    fnRunCIInstallersDocker = runCIInstallersDocker
+	// CI installer helpers (install + verify)
+	fnRunCIInstallersAll    = runCIInstallersAll
+	fnRunCIInstallersAct    = runCIInstallersAct
+	fnRunCIInstallersDocker = runCIInstallersDocker
 )

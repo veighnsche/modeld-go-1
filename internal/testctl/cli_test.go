@@ -8,7 +8,7 @@ import (
 // helper to restore stubs after each test
 func withCLIStubs(t *testing.T, stubs func()) func() {
 	t.Helper()
-	oldInstallNodeJS := fnInstallNodeJS	
+	oldInstallNodeJS := fnInstallNodeJS
 	oldInstallGo := fnInstallGo
 	oldInstallPy := fnInstallPy
 	oldRunGoTests := fnRunGoTests

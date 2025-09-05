@@ -1,9 +1,9 @@
 package manager
 
 import (
-    "sync"
-    "sync/atomic"
-    "time"
+	"sync"
+	"sync/atomic"
+	"time"
 
 	"modeld/pkg/types"
 )

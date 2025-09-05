@@ -118,9 +118,9 @@ func (m *Manager) Infer(ctx context.Context, req types.InferRequest, w io.Writer
 
 // tokenLineJSON formats a token NDJSON line using json.Marshal for correctness.
 func tokenLineJSON(tok string) []byte {
-    type tokenMsg struct {
-        Token string `json:"token"`
-    }
-    b, _ := json.Marshal(tokenMsg{Token: tok})
-    return append(b, '\n')
+	type tokenMsg struct {
+		Token string `json:"token"`
+	}
+	b, _ := json.Marshal(tokenMsg{Token: tok})
+	return append(b, '\n')
 }
