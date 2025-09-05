@@ -19,6 +19,7 @@ func usage() {
 	fmt.Println("  install all|js|go|py|host:docker|host:act|host:all")
 	fmt.Println("  test go")
 	fmt.Println("  test api:py")
+	fmt.Println("  test py:haiku")
 	fmt.Println("  test web mock|live:host|auto|haiku")
 	fmt.Println("  test all auto")
 	fmt.Println("  test ci all [runner:catthehacker|runner:default]")
@@ -68,13 +69,15 @@ func Run(args []string, cfg *Config) error {
 		}
 	case "test":
 		if len(args) < 2 {
-			return fmt.Errorf("test requires a subcommand: go|api:py|web|all|ci")
+			return fmt.Errorf("test requires a subcommand: go|api:py|py:haiku|web|all|ci")
 		}
 		switch args[1] {
 		case "go":
 			return fnRunGoTests()
 		case "api:py":
 			return fnRunPyTests()
+		case "py:haiku":
+			return fnRunPyTestHaiku()
 		case "web":
 			if len(args) < 3 {
 				return fmt.Errorf("test web requires a mode: mock|live:host|auto|haiku")

@@ -6,7 +6,7 @@ COVER_MODE := atomic
 COVER_THRESHOLD ?= 80
 WEB_PORT ?= 5173
 
-.PHONY: build run tidy clean test cover cover-html cover-check e2e-py \
+.PHONY: build run tidy clean test cover cover-html cover-check e2e-py e2e-py-haiku \
         swagger-install swagger-gen swagger-build swagger-run \
         web-build web-preview web-dev \
         e2e-cy-auto e2e-cy-haiku \
@@ -46,6 +46,11 @@ cover-check: cover
 e2e-py:
 	@python3 -m venv .venv
 	@source .venv/bin/activate && pip install -r tests/e2e_py/requirements.txt && pytest -q tests/e2e_py
+
+# Run only the Python haiku E2E test through the Go CLI (testctl)
+e2e-py-haiku:
+	@$(MAKE) testctl-build
+	@bin/testctl test py:haiku
 
 # Tooling versions (can be overridden via environment)
 SWAG_VERSION ?= v1.16.6

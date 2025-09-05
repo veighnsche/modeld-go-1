@@ -11,6 +11,7 @@ var (
 
 	fnRunGoTests = runGoTests
 	fnRunPyTests = runPyTests
+	fnRunPyTestHaiku = runPyTestHaiku
 
 	fnTestWebMock     = testWebMock
 	fnTestWebLiveHost = testWebLiveHost
