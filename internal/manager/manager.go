@@ -34,11 +34,6 @@ type Manager struct {
 	// Optional inference adapter (e.g., llama.cpp). When set and enabled,
 	// Manager.Infer will delegate token generation to this adapter.
 	adapter InferenceAdapter
-
-	// Inference / llama.cpp configuration (flag-driven, no envs)
-	LlamaBin     string
-	LlamaCtx     int
-	LlamaThreads int
 }
 
 func New(reg []types.Model, budgetMB, marginMB int, defaultModel string) *Manager {

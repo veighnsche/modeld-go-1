@@ -15,18 +15,21 @@ type SanityReport struct {
 // It does not mutate state and is safe to call at any time.
 func (m *Manager) SanityCheck() SanityReport {
 	r := SanityReport{}
-	// In-process inference: adapter must be initialized. We don't require external binaries.
+	// Adapter must be initialized for inference
 	if m.adapter == nil {
 		r.LlamaFound = false
 		r.Error = "llama adapter not initialized"
 		return r
 	}
-	// Optionally perform a lightweight check: verify default model path exists if set.
+	// For in-process adapter, optionally verify default model file exists
 	r.LlamaFound = true
 	if m.defaultModel != "" {
 		if mdl, ok := m.getModelByID(m.defaultModel); ok && mdl.Path != "" {
-			if fi, err := os.Stat(mdl.Path); err == nil && !fi.IsDir() {
-				r.LlamaPath = mdl.Path
+			// Skip filesystem checks when using server adapter
+			if _, ok := m.adapter.(*llamaServerAdapter); !ok {
+				if fi, err := os.Stat(mdl.Path); err == nil && !fi.IsDir() {
+					r.LlamaPath = mdl.Path
+				}
 			}
 		}
 	}
@@ -44,16 +47,10 @@ type Check struct {
 // It focuses on:
 // - Adapter presence
 // - Default model configured
-// - Default model path exists and is a file
+// - For in-process mode: default model path exists and is a file
 // Note: it does not attempt to load the model (avoids heavy I/O at startup).
 func (m *Manager) Preflight() []Check {
 	var checks []Check
-	// Build-time support check
-	if !llamaBuilt {
-		checks = append(checks, Check{Name: "llama_support_built", OK: false, Message: "binary built without llama support; rebuild with CGO_ENABLED=1 -tags=llama"})
-		// Early return: other checks are moot without llama
-		return checks
-	}
 	// Adapter presence
 	if m.adapter == nil {
 		checks = append(checks, Check{Name: "adapter_present", OK: false, Message: "llama adapter not initialized"})
@@ -65,21 +62,23 @@ func (m *Manager) Preflight() []Check {
 		checks = append(checks, Check{Name: "default_model_configured", OK: false, Message: "no default model configured"})
 	} else {
 		checks = append(checks, Check{Name: "default_model_configured", OK: true})
-		// Resolve model and check path
+		// Resolve model and check path only for in-process adapter
 		mdl, ok := m.getModelByID(m.defaultModel)
 		if !ok {
 			checks = append(checks, Check{Name: "default_model_in_registry", OK: false, Message: "default model id not found in registry"})
 		} else {
 			checks = append(checks, Check{Name: "default_model_in_registry", OK: true})
-			if mdl.Path == "" {
-				checks = append(checks, Check{Name: "default_model_path_set", OK: false, Message: "default model path is empty"})
-			} else if fi, err := os.Stat(mdl.Path); err != nil {
-				checks = append(checks, Check{Name: "default_model_path_exists", OK: false, Message: err.Error()})
-			} else if fi.IsDir() {
-				checks = append(checks, Check{Name: "default_model_path_is_file", OK: false, Message: "path points to a directory, expected a .gguf file"})
-			} else {
-				checks = append(checks, Check{Name: "default_model_path_exists", OK: true})
-				checks = append(checks, Check{Name: "default_model_path_is_file", OK: true})
+			if _, isServer := m.adapter.(*llamaServerAdapter); !isServer {
+				if mdl.Path == "" {
+					checks = append(checks, Check{Name: "default_model_path_set", OK: false, Message: "default model path is empty"})
+				} else if fi, err := os.Stat(mdl.Path); err != nil {
+					checks = append(checks, Check{Name: "default_model_path_exists", OK: false, Message: err.Error()})
+				} else if fi.IsDir() {
+					checks = append(checks, Check{Name: "default_model_path_is_file", OK: false, Message: "path points to a directory, expected a .gguf file"})
+				} else {
+					checks = append(checks, Check{Name: "default_model_path_exists", OK: true})
+					checks = append(checks, Check{Name: "default_model_path_is_file", OK: true})
+				}
 			}
 		}
 	}

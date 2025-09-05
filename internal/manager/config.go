@@ -24,6 +24,12 @@ type ManagerConfig struct {
 	LlamaBin     string
 	LlamaCtx     int
 	LlamaThreads int
+	// HTTP llama server configuration
+	LlamaServerURL      string
+	LlamaAPIKey         string
+	LlamaRequestTimeout time.Duration
+	LlamaConnectTimeout time.Duration
+	LlamaUseOpenAI      bool
 }
 
 // NewWithConfig constructs a Manager from ManagerConfig.
@@ -47,12 +53,16 @@ func NewWithConfig(cfg ManagerConfig) *Manager {
 	} else {
 		m.maxWait = cfg.MaxWait
 	}
-	// Inference configuration
-	m.LlamaBin = cfg.LlamaBin
-	m.LlamaCtx = cfg.LlamaCtx
-	m.LlamaThreads = cfg.LlamaThreads
-	// Initialize in-process llama adapter by default.
-	m.adapter = NewLlamaAdapter(m.LlamaCtx, m.LlamaThreads)
+	// HTTP server adapter (preferred) if URL is provided
+	if cfg.LlamaServerURL != "" {
+		m.adapter = NewLlamaServerAdapter(
+			cfg.LlamaServerURL,
+			cfg.LlamaAPIKey,
+			cfg.LlamaUseOpenAI,
+			cfg.LlamaRequestTimeout,
+			cfg.LlamaConnectTimeout,
+		)
+	}
 	m.startTime = time.Now()
 	return m
 }

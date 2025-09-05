@@ -45,10 +45,16 @@ func main() {
 	corsOrigins := flag.String("cors-origins", "", "Comma-separated list of allowed CORS origins")
 	corsMethods := flag.String("cors-methods", "", "Comma-separated list of allowed CORS methods")
 	corsHeaders := flag.String("cors-headers", "", "Comma-separated list of allowed CORS request headers")
-	// Inference / llama.cpp (always enabled; flags configure adapter)
+	// Inference / llama.cpp (legacy in-process; deprecated when server URL provided)
 	llamaBin := flag.String("llama-bin", "", "Path to llama.cpp server binary (llama-server)")
 	llamaCtx := flag.Int("llama-ctx", 4096, "Context window size for llama.cpp")
 	llamaThreads := flag.Int("llama-threads", 0, "Threads for llama.cpp (0=auto)")
+	// Inference / llama.cpp server (preferred)
+	llamaURL := flag.String("llama-url", "", "Base URL for llama.cpp server, e.g., http://127.0.0.1:8081")
+	llamaAPIKey := flag.String("llama-api-key", "", "Bearer API key for llama.cpp server (optional)")
+	llamaReqTimeout := flag.Duration("llama-timeout", 30*time.Second, "Per-request timeout for llama server requests")
+	llamaConnTimeout := flag.Duration("llama-connect-timeout", 5*time.Second, "TCP connect timeout for llama server")
+	llamaUseOpenAI := flag.Bool("llama-use-openai", true, "Use OpenAI-compatible endpoints when talking to llama server")
 	flag.Parse()
 
 	// Determine which flags were explicitly set to give CLI precedence over config file
@@ -106,7 +112,7 @@ func main() {
 					*maxWait = d
 				}
 			}
-			// Inference / llama.cpp (CLI has precedence): no enable flag; configured by options
+			// Inference / llama.cpp (CLI has precedence): legacy
 			if !setFlags["llama-bin"] && cfg.LlamaBin != "" {
 				*llamaBin = cfg.LlamaBin
 			}
@@ -115,6 +121,26 @@ func main() {
 			}
 			if !setFlags["llama-threads"] && cfg.LlamaThreads >= 0 {
 				*llamaThreads = cfg.LlamaThreads
+			}
+			// Inference / llama.cpp server
+			if !setFlags["llama-url"] && cfg.LlamaServerURL != "" {
+				*llamaURL = cfg.LlamaServerURL
+			}
+			if !setFlags["llama-api-key"] && cfg.LlamaAPIKey != "" {
+				*llamaAPIKey = cfg.LlamaAPIKey
+			}
+			if !setFlags["llama-timeout"] && cfg.LlamaRequestTimeout != "" {
+				if d, err := time.ParseDuration(cfg.LlamaRequestTimeout); err == nil {
+					*llamaReqTimeout = d
+				}
+			}
+			if !setFlags["llama-connect-timeout"] && cfg.LlamaConnectTimeout != "" {
+				if d, err := time.ParseDuration(cfg.LlamaConnectTimeout); err == nil {
+					*llamaConnTimeout = d
+				}
+			}
+			if !setFlags["llama-use-openai"] {
+				*llamaUseOpenAI = cfg.LlamaUseOpenAI
 			}
 		}
 	}
@@ -155,6 +181,12 @@ func main() {
 		LlamaBin:      *llamaBin,
 		LlamaCtx:      *llamaCtx,
 		LlamaThreads:  *llamaThreads,
+		// Server adapter config
+		LlamaServerURL:      *llamaURL,
+		LlamaAPIKey:         *llamaAPIKey,
+		LlamaRequestTimeout: *llamaReqTimeout,
+		LlamaConnectTimeout: *llamaConnTimeout,
+		LlamaUseOpenAI:      *llamaUseOpenAI,
 	})
 
 	// Preflight: validate adapter presence and default model path.

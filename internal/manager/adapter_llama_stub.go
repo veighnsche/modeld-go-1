@@ -7,9 +7,6 @@ import (
 	"errors"
 )
 
-// llamaBuilt indicates this binary was compiled without real llama support.
-var llamaBuilt = false
-
 // NewLlamaAdapter returns a stub adapter when built without the 'llama' tag.
 func NewLlamaAdapter(ctxSize, threads int) InferenceAdapter { return &llamaStub{} }
 

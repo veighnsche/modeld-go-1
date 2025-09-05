@@ -35,6 +35,12 @@ type Config struct {
 	LlamaBin     string `json:"llama_bin" yaml:"llama_bin" toml:"llama_bin"`
 	LlamaCtx     int    `json:"llama_ctx" yaml:"llama_ctx" toml:"llama_ctx"`
 	LlamaThreads int    `json:"llama_threads" yaml:"llama_threads" toml:"llama_threads"`
+	// Inference (llama.cpp server)
+	LlamaServerURL      string `json:"llama_url" yaml:"llama_url" toml:"llama_url"`
+	LlamaAPIKey         string `json:"llama_api_key" yaml:"llama_api_key" toml:"llama_api_key"`
+	LlamaRequestTimeout string `json:"llama_timeout" yaml:"llama_timeout" toml:"llama_timeout"`
+	LlamaConnectTimeout string `json:"llama_connect_timeout" yaml:"llama_connect_timeout" toml:"llama_connect_timeout"`
+	LlamaUseOpenAI      bool   `json:"llama_use_openai" yaml:"llama_use_openai" toml:"llama_use_openai"`
 }
 
 // Load reads a configuration file based on its extension.
