@@ -150,6 +150,21 @@ func main() {
 		LlamaThreads:     *llamaThreads,
 	})
 
+	// Preflight: validate adapter presence and default model path.
+	checks := mgr.Preflight()
+	preflightOK := true
+	for _, c := range checks {
+		if !c.OK {
+			preflightOK = false
+			log.Printf("[preflight] %s: NOT OK - %s", c.Name, c.Message)
+		} else {
+			log.Printf("[preflight] %s: OK", c.Name)
+		}
+	}
+	if !preflightOK {
+		log.Fatalf("preflight failed; resolve issues above and restart")
+	}
+
 	// Set a base context that we will cancel on shutdown to propagate cancellation to handlers.
 	baseCtx, baseCancel := context.WithCancel(context.Background())
 	defer baseCancel()

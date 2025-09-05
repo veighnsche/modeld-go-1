@@ -14,12 +14,12 @@ WEB_PORT ?= 5173
         llama-libs build-llama \
         ci-go ci-e2e-python ci-e2e-cypress ci-all
 
-build:
+build: llama-libs
 	@mkdir -p bin
-	@env -u CGO_LDFLAGS -u CGO_CFLAGS -u LD_LIBRARY_PATH CGO_ENABLED=0 go build -o $(BIN) ./cmd/modeld
+	@go build -o $(BIN) ./cmd/modeld
 
-run:
-	@go run ./cmd/modeld
+run: build
+	@./$(BIN)
 
 tidy:
 	@go mod tidy
@@ -27,17 +27,15 @@ tidy:
 clean:
 	@rm -rf bin
 
-test:
-	@env -u CGO_LDFLAGS -u CGO_CFLAGS -u LD_LIBRARY_PATH CGO_ENABLED=0 go test ./... -v
-
+test: llama-libs
+	@go test ./... -v
 
 cover:
 	@bash -euo pipefail -c '\
 		pkgs=$$(go list ./... | grep -v "^modeld/cmd/" | grep -v "^modeld/docs$$" | grep -v "^modeld/internal/testctl$$"); \
 		echo "Running coverage for packages:"; \
 		for p in $$pkgs; do echo "  - $$p"; done; \
-		env -u CGO_LDFLAGS -u CGO_CFLAGS -u LD_LIBRARY_PATH CGO_ENABLED=0 \
-			go test $$pkgs -covermode=$(COVER_MODE) -coverprofile=$(COVER_PROFILE) -count=1 -v \
+		go test $$pkgs -covermode=$(COVER_MODE) -coverprofile=$(COVER_PROFILE) -count=1 -v \
 	'
 	@echo "Coverage profile written to $(COVER_PROFILE)"
 
@@ -132,11 +130,8 @@ llama-libs:
 	@install -m644 $(LLAMA_BIN_DIR)/libggml*.so bin/ 2>/dev/null || true
 	@echo "Synced llama.cpp shared libs to ./bin"
 
-# Build with the 'llama' build tag and CGO enabled; linking/rpath handled by internal/manager/llama_cgo.go
-build-llama: llama-libs
-	@mkdir -p bin
-	@CGO_ENABLED=1 go build -tags=llama -o $(BIN) ./cmd/modeld
-	@echo "Built $(BIN) with llama support (rpath=$$ORIGIN, no env vars required)"
+# Backward-compat alias: now identical to `build` (llama is the default)
+build-llama: build
 
 # Cypress E2E (UI harness)
 # Keep only the heavy, full-suite target here; all other variants live in the CLI.

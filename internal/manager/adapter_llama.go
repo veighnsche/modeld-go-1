@@ -1,5 +1,3 @@
-//go:build llama
-
 package manager
 
 import (
@@ -123,7 +121,7 @@ func mapInferParamsToPredictOptions(params InferParams, threads int) []llama.Pre
 		po = append(po, llama.SetSeed(params.Seed))
 	}
 	if len(params.Stop) > 0 {
-		po = append(po, llama.SetStopWords(params.Stop))
+		po = append(po, llama.SetStopWords(params.Stop...))
 	}
 	return po
 }
