@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -17,6 +18,27 @@ import (
 	"modeld/internal/manager"
 	"modeld/pkg/types"
 )
+
+// NewMuxWithOptions builds the router applying the provided Options. This keeps
+// backward compatibility by delegating to NewMux after configuring package
+// globals via existing setters. Callers that want to avoid globals can keep the
+// Options object at edges and call this constructor.
+func NewMuxWithOptions(svc Service, opt Options) http.Handler {
+	if opt.MaxBodyBytes > 0 {
+		SetMaxBodyBytes(opt.MaxBodyBytes)
+	}
+	if opt.InferTimeoutSeconds >= 0 { // 0 is allowed
+		SetInferTimeoutSeconds(opt.InferTimeoutSeconds)
+	}
+	SetCORSOptions(opt.CORSEnabled, opt.CORSAllowedOrigins, opt.CORSAllowedMethods, opt.CORSAllowedHeaders)
+	if opt.Logger != nil {
+		SetLogger(*opt.Logger)
+	}
+	if opt.BaseContext != nil {
+		SetBaseContext(opt.BaseContext)
+	}
+	return NewMux(svc)
+}
 
 // Service defines the methods required by the HTTP API layer.
 type Service interface {
@@ -165,17 +187,7 @@ func postInfer(svc Service) http.HandlerFunc {
 		if lvl >= LevelDebug {
 			writer = io.MultiWriter(w, &loggingLineWriter{})
 		}
-		if lvl >= LevelInfo {
-			if zlog != nil {
-				z := zlog.Info().Str("path", r.URL.Path).Str("model", req.Model)
-				if rid := middleware.GetReqID(r.Context()); rid != "" {
-					z = z.Str("request_id", rid)
-				}
-				z.Msg("infer start")
-			} else {
-				log.Printf("infer start path=%s model=%s", r.URL.Path, req.Model)
-			}
-		}
+		logInferStart(lvl, r, req.Model)
 		// Join server base context with request context so shutdown cancels work too.
 		joinedCtx, cancel := joinContexts(serverBaseCtx, r.Context())
 		// Apply optional per-handler timeout if configured
@@ -193,90 +205,30 @@ func postInfer(svc Service) http.HandlerFunc {
 			// Map well-known manager errors to HTTP status codes
 			if manager.IsModelNotFound(err) {
 				writeJSONError(w, http.StatusNotFound, err.Error())
-				if lvl >= LevelInfo {
-					if zlog != nil {
-						z := zlog.Info().Str("status", "404").Dur("dur", time.Since(start))
-						if rid := middleware.GetReqID(r.Context()); rid != "" {
-							z = z.Str("request_id", rid)
-						}
-						z.Err(err).Msg("infer end")
-					} else {
-						log.Printf("infer end status=404 dur=%s err=%v", time.Since(start), err)
-					}
-				}
+				logInferEnd(lvl, start, r, "404", err)
 				return
 			}
 			if manager.IsDependencyUnavailable(err) {
 				writeJSONError(w, http.StatusServiceUnavailable, err.Error())
-				if lvl >= LevelInfo {
-					if zlog != nil {
-						z := zlog.Info().Str("status", "503").Dur("dur", time.Since(start))
-						if rid := middleware.GetReqID(r.Context()); rid != "" {
-							z = z.Str("request_id", rid)
-						}
-						z.Err(err).Msg("infer end")
-					} else {
-						log.Printf("infer end status=503 dur=%s err=%v", time.Since(start), err)
-					}
-				}
+				logInferEnd(lvl, start, r, "503", err)
 				return
 			}
 			if manager.IsTooBusy(err) {
 				writeJSONError(w, http.StatusTooManyRequests, err.Error())
 				IncrementBackpressure("queue")
-				if lvl >= LevelInfo {
-					if zlog != nil {
-						z := zlog.Info().Str("status", "429").Dur("dur", time.Since(start))
-						if rid := middleware.GetReqID(r.Context()); rid != "" {
-							z = z.Str("request_id", rid)
-						}
-						z.Err(err).Msg("infer end")
-					} else {
-						log.Printf("infer end status=429 dur=%s err=%v", time.Since(start), err)
-					}
-				}
+				logInferEnd(lvl, start, r, "429", err)
 				return
 			}
 			if he, ok := err.(HTTPError); ok {
 				writeJSONError(w, he.StatusCode(), he.Error())
-				if lvl >= LevelInfo {
-					if zlog != nil {
-						z := zlog.Info().Int("status", he.StatusCode()).Dur("dur", time.Since(start))
-						if rid := middleware.GetReqID(r.Context()); rid != "" {
-							z = z.Str("request_id", rid)
-						}
-						z.Err(err).Msg("infer end")
-					} else {
-						log.Printf("infer end status=%d dur=%s err=%v", he.StatusCode(), time.Since(start), err)
-					}
-				}
+				logInferEnd(lvl, start, r, strconv.Itoa(he.StatusCode()), err)
 				return
 			}
 			writeJSONError(w, http.StatusInternalServerError, err.Error())
-			if lvl >= LevelInfo {
-				if zlog != nil {
-					z := zlog.Info().Str("status", "500").Dur("dur", time.Since(start))
-					if rid := middleware.GetReqID(r.Context()); rid != "" {
-						z = z.Str("request_id", rid)
-					}
-					z.Err(err).Msg("infer end")
-				} else {
-					log.Printf("infer end status=500 dur=%s err=%v", time.Since(start), err)
-				}
-			}
+			logInferEnd(lvl, start, r, "500", err)
 			return
 		}
-		if lvl >= LevelInfo {
-			if zlog != nil {
-				z := zlog.Info().Str("status", "200").Dur("dur", time.Since(start))
-				if rid := middleware.GetReqID(r.Context()); rid != "" {
-					z = z.Str("request_id", rid)
-				}
-				z.Msg("infer end")
-			} else {
-				log.Printf("infer end status=200 dur=%s", time.Since(start))
-			}
-		}
+		logInferEnd(lvl, start, r, "200", nil)
 	}
 }
 

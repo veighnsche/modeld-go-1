@@ -8,10 +8,27 @@ import (
 )
 
 func TestExpandHome(t *testing.T) {
-	// Determine home dir; if unavailable in env, skip
-	home, err := os.UserHomeDir()
-	if err != nil {
-		t.Skip("no home dir available")
+	// Set a deterministic HOME for the duration of this test so we never skip.
+	origHome, hadHome := os.LookupEnv("HOME")
+	origUserProfile, hadUserProfile := os.LookupEnv("USERPROFILE")
+	t.Cleanup(func() {
+		if hadHome {
+			_ = os.Setenv("HOME", origHome)
+		} else {
+			_ = os.Unsetenv("HOME")
+		}
+		if hadUserProfile {
+			_ = os.Setenv("USERPROFILE", origUserProfile)
+		} else {
+			_ = os.Unsetenv("USERPROFILE")
+		}
+	})
+
+	home := t.TempDir()
+	// Configure both env vars for cross-platform behavior of os.UserHomeDir.
+	_ = os.Setenv("HOME", home)
+	if runtime.GOOS == "windows" {
+		_ = os.Setenv("USERPROFILE", home)
 	}
 	// raw path unaffected
 	if got, err := ExpandHome("/tmp"); err != nil || got != "/tmp" {

@@ -139,6 +139,38 @@ Error responses (JSON):
 {"error":"invalid JSON body","code":400}
 ```
 
+## HTTP API configuration and Swagger
+
+You can configure the HTTP layer via an `Options` struct and the `NewMuxWithOptions` constructor in `internal/httpapi/`.
+
+```go
+svc := myServiceImplementation{}
+opt := httpapi.Options{
+    MaxBodyBytes:        2 << 20, // 2 MiB
+    InferTimeoutSeconds: 60,      // per-request timeout for /infer
+    CORSEnabled:         true,
+    CORSAllowedOrigins:  []string{"*"},
+    CORSAllowedMethods:  []string{"GET", "POST", "OPTIONS"},
+    CORSAllowedHeaders:  []string{"Content-Type", "X-Log-Level"},
+    Logger:              &myZerologLogger,
+    BaseContext:         context.Background(),
+}
+handler := httpapi.NewMuxWithOptions(svc, opt)
+srv := &http.Server{Addr: ":8080", Handler: handler}
+```
+
+Metrics path labels are normalized to chi route patterns (e.g. `/infer`) to keep Prometheus label cardinality low.
+
+To enable Swagger UI and JSON (served under `/swagger/*`), build with the `swagger` tag:
+
+```bash
+go build -tags=swagger ./cmd/modeld
+```
+
+When built with `-tags=swagger`, the routes are:
+- `/swagger/index.html` (UI)
+- `/swagger/doc.json` (OpenAPI spec)
+
 ## Documentation
 
 - Overview: [docs/overview.md](docs/overview.md)

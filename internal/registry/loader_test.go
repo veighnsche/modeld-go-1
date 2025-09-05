@@ -40,14 +40,30 @@ func TestGGUFScanner_ScanFiltersGGUF(t *testing.T) {
 }
 
 func TestGGUFScanner_ExpandHome(t *testing.T) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		t.Skipf("no home dir on this platform: %v", err)
+	// Use a deterministic HOME so the test never skips.
+	origHome, hadHome := os.LookupEnv("HOME")
+	origUserProfile, hadUserProfile := os.LookupEnv("USERPROFILE")
+	t.Cleanup(func() {
+		if hadHome {
+			_ = os.Setenv("HOME", origHome)
+		} else {
+			_ = os.Unsetenv("HOME")
+		}
+		if hadUserProfile {
+			_ = os.Setenv("USERPROFILE", origUserProfile)
+		} else {
+			_ = os.Unsetenv("USERPROFILE")
+		}
+	})
+	home := t.TempDir()
+	_ = os.Setenv("HOME", home)
+	if runtime.GOOS == "windows" {
+		_ = os.Setenv("USERPROFILE", home)
 	}
 	// create temporary directory under home
 	hTmp, err := os.MkdirTemp(home, "modeld-registry-*")
 	if err != nil {
-		t.Skipf("cannot create temp under home: %v", err)
+		t.Fatalf("cannot create temp under home: %v", err)
 	}
 	defer os.RemoveAll(hTmp)
 	// create a gguf file inside it

@@ -1,10 +1,13 @@
 package httpapi
 
 import (
+	"bytes"
 	"log"
 	"net/http"
 	"os"
+	"time"
 
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/rs/zerolog"
 )
 
@@ -22,7 +25,7 @@ type loggingLineWriter struct {
 func (lw *loggingLineWriter) Write(p []byte) (int, error) {
 	lw.buf = append(lw.buf, p...)
 	for {
-		idx := indexByte(lw.buf, '\n')
+		idx := bytes.IndexByte(lw.buf, '\n')
 		if idx < 0 {
 			break
 		}
@@ -33,15 +36,6 @@ func (lw *loggingLineWriter) Write(p []byte) (int, error) {
 		lw.buf = lw.buf[idx+1:]
 	}
 	return len(p), nil
-}
-
-func indexByte(b []byte, c byte) int {
-	for i := range b {
-		if b[i] == c {
-			return i
-		}
-	}
-	return -1
 }
 
 // LogLevel controls per-request logging behavior.
@@ -93,4 +87,43 @@ func requestLogLevel(r *http.Request) LogLevel {
 		return LevelDebug
 	}
 	return defaultLogLevel
+}
+
+// logInferStart emits a standardized "infer start" message when LevelInfo or higher.
+func logInferStart(lvl LogLevel, r *http.Request, model string) {
+	if lvl < LevelInfo {
+		return
+	}
+	if zlog != nil {
+		z := zlog.Info().Str("path", r.URL.Path).Str("model", model)
+		if rid := middleware.GetReqID(r.Context()); rid != "" {
+			z = z.Str("request_id", rid)
+		}
+		z.Msg("infer start")
+		return
+	}
+	log.Printf("infer start path=%s model=%s", r.URL.Path, model)
+}
+
+// logInferEnd emits a standardized "infer end" message with status and optional error.
+func logInferEnd(lvl LogLevel, start time.Time, r *http.Request, status string, err error) {
+	if lvl < LevelInfo {
+		return
+	}
+	if zlog != nil {
+		z := zlog.Info().Str("status", status).Dur("dur", time.Since(start))
+		if rid := middleware.GetReqID(r.Context()); rid != "" {
+			z = z.Str("request_id", rid)
+		}
+		if err != nil {
+			z = z.Err(err)
+		}
+		z.Msg("infer end")
+		return
+	}
+	if err != nil {
+		log.Printf("infer end status=%s dur=%s err=%v", status, time.Since(start), err)
+	} else {
+		log.Printf("infer end status=%s dur=%s", status, time.Since(start))
+	}
 }

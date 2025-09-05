@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -68,7 +69,7 @@ func (sr *statusRecorder) WriteHeader(code int) {
 // MetricsMiddleware instruments requests for Prometheus
 func MetricsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path := r.URL.Path // for simplicity; Router pattern would be nicer
+		path := routePatternOrPath(r)
 		method := r.Method
 		httpInflight.WithLabelValues(path).Inc()
 		defer httpInflight.WithLabelValues(path).Dec()
@@ -81,6 +82,17 @@ func MetricsMiddleware(next http.Handler) http.Handler {
 		httpRequestsTotal.WithLabelValues(path, method, statusLabel).Inc()
 		httpRequestDuration.WithLabelValues(path, method, statusLabel).Observe(dur)
 	})
+}
+
+// routePatternOrPath returns the chi route pattern if available, otherwise
+// falls back to URL path. This avoids high-cardinality label values.
+func routePatternOrPath(r *http.Request) string {
+	if rc := chi.RouteContext(r.Context()); rc != nil {
+		if p := rc.RoutePattern(); p != "" {
+			return p
+		}
+	}
+	return r.URL.Path
 }
 
 // IncrementBackpressure is called when returning 429 to the client
