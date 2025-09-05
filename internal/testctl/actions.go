@@ -3,7 +3,7 @@ package testctl
 // Indirection layer to allow stubbing in tests
 
 var (
-	fnInstallJS         = installJS
+	fnInstallNodeJS     = installNodeJS
 	fnInstallGo         = installGo
 	fnInstallPy         = installPy
 	fnInstallHostDocker = installHostDocker

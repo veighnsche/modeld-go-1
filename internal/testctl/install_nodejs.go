@@ -6,9 +6,9 @@ import (
     "os/exec"
 )
 
-// installJS installs JS dependencies in the repo root and web/ using pnpm.
-func installJS() error {
-    info("Installing JS dependencies...")
+// installNodeJS installs Node.js dependencies in the repo root and web/ using pnpm.
+func installNodeJS() error {
+    info("Installing Node.js dependencies...")
     // Try corepack to enable pnpm if not present
     if _, err := exec.LookPath("pnpm"); err != nil {
         if _, corepackErr := exec.LookPath("corepack"); corepackErr == nil {
@@ -25,6 +25,6 @@ func installJS() error {
     if err := runCmdVerbose(context.Background(), "pnpm", "-C", "web", "install", "--frozen-lockfile"); err != nil {
         return err
     }
-    info("JS dependencies installed.")
+    info("Node.js dependencies installed.")
     return nil
 }

@@ -16,7 +16,7 @@ func usage() {
 	fmt.Println("Usage: testctl [--web-port N] [--log-level info] <command>")
 	fmt.Println()
 	fmt.Println("Commands:")
-	fmt.Println("  install all|js|go|py|llama|llama:cuda|go-llama.cpp|go-llama.cpp:cuda|host:docker|host:act|host:all")
+	fmt.Println("  install all|nodejs|go|py|llama|llama:cuda|go-llama.cpp|go-llama.cpp:cuda|host:docker|host:act|host:all")
 	fmt.Println("  test go")
 	fmt.Println("  test api:py")
 	fmt.Println("  test py:haiku")
@@ -32,11 +32,11 @@ func Run(args []string, cfg *Config) error {
 	switch args[0] {
 	case "install":
 		if len(args) < 2 {
-			return fmt.Errorf("install requires a subcommand: all|js|go|py|llama|llama:cuda|host:docker|host:act|host:all")
+			return fmt.Errorf("install requires a subcommand: all|nodejs|go|py|llama|llama:cuda|host:docker|host:act|host:all")
 		}
 		switch args[1] {
 		case "all":
-			if err := fnInstallJS(); err != nil {
+			if err := fnInstallNodeJS(); err != nil {
 				return err
 			}
 			if err := fnInstallGo(); err != nil {
@@ -58,8 +58,8 @@ func Run(args []string, cfg *Config) error {
 				return err
 			}
 			return nil
-		case "js":
-			return fnInstallJS()
+		case "nodejs":
+			return fnInstallNodeJS()
 		case "go":
 			return fnInstallGo()
 		case "py":

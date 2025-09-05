@@ -8,7 +8,7 @@ import (
 // helper to restore stubs after each test
 func withCLIStubs(t *testing.T, stubs func()) func() {
 	t.Helper()
-	oldInstallJS := fnInstallJS
+	oldInstallNodeJS := fnInstallNodeJS	
 	oldInstallGo := fnInstallGo
 	oldInstallPy := fnInstallPy
 	oldRunGoTests := fnRunGoTests
@@ -18,7 +18,7 @@ func withCLIStubs(t *testing.T, stubs func()) func() {
 	oldHasHostModels := fnHasHostModels
 	stubs()
 	return func() {
-		fnInstallJS = oldInstallJS
+		fnInstallNodeJS = oldInstallNodeJS
 		fnInstallGo = oldInstallGo
 		fnInstallPy = oldInstallPy
 		fnRunGoTests = oldRunGoTests
@@ -34,7 +34,7 @@ func TestRun_InstallCommands(t *testing.T) {
 
 	// js
 	cleanup := withCLIStubs(t, func() {
-		fnInstallJS = func() error { return nil }
+		fnInstallNodeJS = func() error { return nil }
 	})
 	defer cleanup()
 	if err := Run([]string{"install", "js"}, cfg); err != nil {
@@ -44,7 +44,7 @@ func TestRun_InstallCommands(t *testing.T) {
 	// all
 	calls := make(map[string]int)
 	cleanup = withCLIStubs(t, func() {
-		fnInstallJS = func() error { calls["js"]++; return nil }
+		fnInstallNodeJS = func() error { calls["js"]++; return nil }
 		fnInstallGo = func() error { calls["go"]++; return nil }
 		fnInstallPy = func() error { calls["py"]++; return nil }
 	})
@@ -179,7 +179,7 @@ func TestRun_Errors(t *testing.T) {
 
 	// propagate sub-action errors
 	cleanup := withCLIStubs(t, func() {
-		fnInstallJS = func() error { return errors.New("boom") }
+		fnInstallNodeJS = func() error { return errors.New("boom") }
 	})
 	defer cleanup()
 	if err := Run([]string{"install", "js"}, cfg); err == nil {
