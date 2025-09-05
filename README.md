@@ -1,6 +1,6 @@
 # modeld-go (scaffold)
 
-![CI](https://github.com/veighnsche/modeld-go-1/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/veighnsche/modeld-go-1/actions/workflows/ci-go.yml/badge.svg)
 [![codecov](https://codecov.io/gh/veighnsche/modeld-go-1/graph/badge.svg)](https://codecov.io/gh/veighnsche/modeld-go-1)
 
 Minimal scaffold for a Go control-plane around llama.cpp:
@@ -13,6 +13,16 @@ Minimal scaffold for a Go control-plane around llama.cpp:
 # modeld-go
 
 A lightweight control-plane service (Go 1.22+) to manage multiple preloaded llama.cpp model instances within a configurable VRAM budget and margin, and to serve inference requests over a clean HTTP API. Hot math stays in llama.cpp (C/C++); Go handles lifecycle, I/O, backpressure, and observability.
+
+## Documentation
+
+- Overview: [docs/overview.md](docs/overview.md)
+- Build & Run: [docs/build-and-run.md](docs/build-and-run.md)
+- API Reference: [docs/api.md](docs/api.md)
+- Testing (Go, Python, Cypress, testctl): [docs/testing.md](docs/testing.md)
+- Run CI locally with act: [docs/ci-local.md](docs/ci-local.md)
+- Deployment (systemd): [docs/deployment.md](docs/deployment.md)
+- Metrics: [docs/metrics.md](docs/metrics.md)
 
 ## Features
 
@@ -35,7 +45,7 @@ A lightweight control-plane service (Go 1.22+) to manage multiple preloaded llam
 - `internal/llm/` — adapter interface for llama.cpp integration
   - `internal/llm/adapter.go`
 - `pkg/types/` — shared request/response DTOs
-  - `pkg/types/types.go`
+  - `pkg/types/api.go`
 - `deploy/` — systemd unit template
   - `deploy/modeld.service`
 - `scripts/` — dev helpers
@@ -184,7 +194,7 @@ Endpoints:
 
 - `GET /status`
   - Returns instance summaries and VRAM budgeting info using `pkg/types.StatusResponse`/`InstanceStatus`.
-  - Shape (`pkg/types/types.go`):
+  - Shape (`pkg/types/api.go`):
     ```go
     type InstanceStatus struct {
         ModelID   string `json:"model_id"`
@@ -295,6 +305,8 @@ There are two primary test suites:
 Common endpoints exercised include `/healthz`, `/readyz`, `/models`, `/status`, and streaming `POST /infer` (NDJSON). Negative-path tests cover 404 and backpressure (429) scenarios.
 
 ## Continuous Integration (CI)
+
+For instructions to run the CI workflow locally with `act`, see [docs/ci-local.md](docs/ci-local.md).
 
 GitHub Actions runs on pushes and pull requests:
 
@@ -503,8 +515,6 @@ The CLI is implemented as a thin entrypoint with reusable internal logic:
   - `ParseConfig()` — small wrapper over `ParseConfigWith` using `flag.CommandLine` and `os.Args[1:]`.
   - `MainWithArgs(args []string) int` — testable entrypoint that returns an exit code.
   - `Main() int` — production entrypoint used by `cmd/testctl`.
-
-Legacy sources under `cmd/testctl/` are preserved for reference but excluded from builds via `//go:build ignore` to prevent conflicts. All new work should target `internal/testctl/`.
 
 Testing the CLI logic (unit):
 
