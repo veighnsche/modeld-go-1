@@ -45,6 +45,8 @@ func testWebMock(cfg *Config) error {
 	// Run cypress with dynamic baseUrl
 	return runEnvCmdStreaming(context.Background(), map[string]string{
 		"CYPRESS_BASE_URL": fmt.Sprintf("http://localhost:%d", webPort),
+		// Signal to Cypress specs that we are running with mocks enabled
+		"CYPRESS_USE_MOCKS": "1",
 	}, "pnpm", "run", "test:e2e:run")
 }
 

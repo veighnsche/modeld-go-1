@@ -23,13 +23,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'pnpm'
-          cache-dependency-path: 'pnpm-lock.yaml'
+          # Avoid using pnpm cache here because pnpm may not be installed yet in local act images
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 9
+        # Let action read the version from package.json's packageManager field
 
       - name: Install headless display (xvfb)
         run: |
@@ -37,6 +35,28 @@ jobs:
             sudo apt-get update -y && sudo apt-get install -y xvfb
           else
             apt-get update -y && apt-get install -y xvfb
+          fi
+
+      - name: Install Cypress system dependencies (Ubuntu)
+        run: |
+          set -euo pipefail
+          PKGS="\
+          libnss3 \
+          libatk-bridge2.0-0 \
+          libgtk-3-0 \
+          libgbm1 \
+          libasound2 \
+          libxss1 \
+          libxtst6 \
+          libnotify-dev \
+          xauth \
+          fonts-liberation \
+          libdrm2 \
+          "
+          if command -v sudo >/dev/null 2>&1; then
+            sudo apt-get update -y && sudo apt-get install -y $PKGS
+          else
+            apt-get update -y && apt-get install -y $PKGS
           fi
 
       - name: Set up Go

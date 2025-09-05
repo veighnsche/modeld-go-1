@@ -12,6 +12,7 @@ func TestSetBaseContext_NilResetsToBackground(t *testing.T) {
 	defer cancel()
 	SetBaseContext(ctx)
 	// now reset with nil
+	// nolint:staticcheck // SA1012: this test intentionally passes nil to verify fallback behavior
 	SetBaseContext(nil)
 	// join with a short-lived context and ensure cancel triggers
 	a, ac := context.WithCancel(context.Background())
@@ -31,7 +32,8 @@ func TestSetBaseContext_NilResetsToBackground(t *testing.T) {
 
 func TestJoinContexts_CancelsWhenEitherDone(t *testing.T) {
 	a, ac := context.WithCancel(context.Background())
-	b, _ := context.WithCancel(context.Background())
+	b, bc := context.WithCancel(context.Background())
+	defer bc()
 	j, cancelJ := joinContexts(a, b)
 	defer cancelJ()
 	// cancel A and expect joined canceled

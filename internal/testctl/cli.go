@@ -166,11 +166,31 @@ func ParseConfig() (*Config, []string) {
 // mutating global state.
 func ParseConfigWith(fs *flag.FlagSet, args []string) (*Config, []string) {
 	cfg := &Config{}
-	webPort := fs.Int("web-port", envInt("WEB_PORT", 5173), "Port for Vite preview")
-	logLvl := fs.String("log-level", envStr("TESTCTL_LOG_LEVEL", "info"), "Log level: debug|info|warn|error")
+	// Only define flags if they are not already present on the provided FlagSet.
+	if fs.Lookup("web-port") == nil {
+		fs.Int("web-port", envInt("WEB_PORT", 5173), "Port for Vite preview")
+	}
+	if fs.Lookup("log-level") == nil {
+		fs.String("log-level", envStr("TESTCTL_LOG_LEVEL", "info"), "Log level: debug|info|warn|error")
+	}
 	_ = fs.Parse(args)
-	cfg.WebPort = *webPort
-	cfg.LogLvl = *logLvl
+	// Read back values from the parsed FlagSet, falling back to env defaults.
+	wp := envInt("WEB_PORT", 5173)
+	if f := fs.Lookup("web-port"); f != nil {
+		var n int
+		_, _ = fmt.Sscanf(f.Value.String(), "%d", &n)
+		if n != 0 {
+			wp = n
+		}
+	}
+	ll := envStr("TESTCTL_LOG_LEVEL", "info")
+	if f := fs.Lookup("log-level"); f != nil {
+		if v := f.Value.String(); v != "" {
+			ll = v
+		}
+	}
+	cfg.WebPort = wp
+	cfg.LogLvl = ll
 	return cfg, fs.Args()
 }
 
