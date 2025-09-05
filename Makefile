@@ -9,7 +9,7 @@ WEB_PORT ?= 5173
 .PHONY: build run tidy clean test cover cover-html cover-check e2e-py \
         swagger-install swagger-gen swagger-build swagger-run \
         web-build web-preview web-dev \
-        e2e-cy-auto \
+        e2e-cy-auto e2e-cy-haiku \
         test-all cli test-cli testctl-build \
         ci-go ci-e2e-python ci-e2e-cypress ci-all
 
@@ -114,6 +114,11 @@ web-dev:
 e2e-cy-auto:
 	@$(MAKE) testctl-build
 	@bin/testctl test web auto
+
+# Run only the Haiku cypress spec end-to-end against a live backend using host models
+e2e-cy-haiku:
+	@$(MAKE) testctl-build
+	@WEB_PORT=$(WEB_PORT) bin/testctl test web haiku
 
 # Convenience: launch the Bash CLI helper
 cli:

@@ -3,6 +3,13 @@ import * as fs from 'fs'
 import * as path from 'path'
 
 export default defineConfig({
+  // Enforce a strict 20s maximum timeout across the board
+  defaultCommandTimeout: 20_000,
+  requestTimeout: 20_000,
+  responseTimeout: 20_000,
+  pageLoadTimeout: 20_000,
+  execTimeout: 20_000,
+  taskTimeout: 20_000,
   e2e: {
     specPattern: 'e2e/specs/**/*.cy.{ts,tsx}',
     baseUrl: process.env.CYPRESS_BASE_URL || 'http://localhost:5173',
