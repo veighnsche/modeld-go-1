@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 )
 
 type Config struct {
@@ -20,6 +21,8 @@ func usage() {
 	fmt.Println("  test api:py")
 	fmt.Println("  test web mock|live:host|auto")
 	fmt.Println("  test all auto")
+	fmt.Println("  test ci all [runner:catthehacker|runner:default]")
+	fmt.Println("  test ci one <workflow.yml|yaml> [runner:catthehacker|runner:default]")
 }
 
 // Run dispatches the CLI command. It returns an error instead of exiting,
@@ -65,7 +68,7 @@ func Run(args []string, cfg *Config) error {
 		}
 	case "test":
 		if len(args) < 2 {
-			return fmt.Errorf("test requires a subcommand: go|api:py|web|all")
+			return fmt.Errorf("test requires a subcommand: go|api:py|web|all|ci")
 		}
 		switch args[1] {
 		case "go":
@@ -107,6 +110,45 @@ func Run(args []string, cfg *Config) error {
 			}
 			info("[testctl] No host models, running mock UI suite")
 			return fnTestWebMock(cfg)
+		case "ci":
+			if len(args) < 3 {
+				return fmt.Errorf("test ci requires a subcommand: all|one")
+			}
+			// default to catthehacker runner mapping unless explicitly set to default
+			useCat := true
+			parseRunner := func(tok string) bool {
+				if tok == "runner:catthehacker" {
+					useCat = true
+					return true
+				}
+				if tok == "runner:default" {
+					useCat = false
+					return true
+				}
+				return false
+			}
+			switch args[2] {
+			case "all":
+				if len(args) >= 4 {
+					_ = parseRunner(args[3])
+				}
+				return fnRunCIAll(useCat)
+			case "one":
+				if len(args) < 4 {
+					return fmt.Errorf("test ci one requires a workflow file name, e.g., ci-go.yml")
+				}
+				wf := args[3]
+				if len(args) >= 5 {
+					_ = parseRunner(args[4])
+				}
+				// If only a basename given, qualify it under .github/workflows
+				if !strings.Contains(wf, "/") && !strings.HasPrefix(wf, ".github/workflows/") {
+					wf = ".github/workflows/" + wf
+				}
+				return fnRunCIWorkflow(wf, useCat)
+			default:
+				return fmt.Errorf("unknown test ci mode: %s", args[2])
+			}
 		default:
 			return fmt.Errorf("unknown test subcommand: %s", args[1])
 		}

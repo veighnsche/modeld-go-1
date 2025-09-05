@@ -16,4 +16,8 @@ var (
 	fnTestWebLiveHost = testWebLiveHost
 
 	fnHasHostModels = hasHostModels
+
+	// CI helpers
+	fnRunCIAll      = runCIAll
+	fnRunCIWorkflow = runCIWorkflow
 )
