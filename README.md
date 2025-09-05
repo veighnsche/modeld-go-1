@@ -23,33 +23,28 @@ A lightweight control-plane service (Go 1.23+) to manage multiple preloaded llam
 - Build & Run the API: see [docs/build-and-run.md](docs/build-and-run.md)
 - API reference (Swagger): see [docs/api.md](docs/api.md)
 
-## Build modes and llama.cpp runtime
+## Build mode and llama.cpp runtime
 
-There are two build modes. The default is a no-CGO stub for fast development and CI. The in‑process llama runtime is available via build tags.
+The default build is llama‑enabled (CGO) and produces a binary capable of local inference via `go-llama.cpp`.
 
-- Stub (default, no CGO):
-  - No native dependencies. Useful for API/dev/CI.
-  - Files: `internal/manager/adapter_llama_stub.go`.
-
-- In‑process llama (CGO):
-  - Enabled with: `-tags=llama`.
+- In‑process llama (default):
+  - Makefile `build` target compiles with `CGO_ENABLED=1 -tags=llama`.
   - Uses `github.com/go-skynet/go-llama.cpp` to run models in‑process.
   - Files: `internal/manager/adapter_llama.go`, `internal/manager/llama_cgo.go`.
+
+- Stub (opt-in, no CGO):
+  - Only when you intentionally build without the `llama` tag (not the default).
+  - Files: `internal/manager/adapter_llama_stub.go`.
+  - The server preflight will hard-fail with a clear message if run without llama support.
 
 Notes
 
 - External `llama_server` process mode has been removed. All inference goes through the in‑process go‑llama.cpp adapter.
 - `llama_cgo.go` sets an rpath of `$ORIGIN` so the loader can find `libllama.so` next to your built binary, if you place it there.
 
-### Enabling in‑process llama
+### In‑process llama configuration
 
-1) Build with the llama tag:
-
-```bash
-go build -tags=llama ./cmd/modeld
-```
-
-2) Provide a config that enables inference and sets llama parameters (example snippet):
+Provide a config that enables inference and sets llama parameters (example snippet):
 
 ```go
 mgr := manager.NewWithConfig(manager.ManagerConfig{
@@ -60,10 +55,34 @@ mgr := manager.NewWithConfig(manager.ManagerConfig{
 })
 ```
 
-3) Ensure the native llama library is discoverable at runtime. Options:
+Ensure the native llama library is discoverable at runtime. Options:
 
 - Place `libllama.so` next to the built binary (benefits from `$ORIGIN` rpath set by `llama_cgo.go`).
 - Or install it in a system path that the dynamic loader uses.
+
+### Llama library location (LLAMA_BIN_DIR)
+
+The Makefile copies the required shared libraries from `LLAMA_BIN_DIR` into `./bin` before building, so the loader finds them via `$ORIGIN`.
+
+- Default expected path (under your home directory):
+
+  - `$HOME/apps/llama.cpp/build/bin`
+
+- Alternate known path:
+
+  - `$HOME/src/llama.cpp/build-cuda14/bin`
+
+Override when needed:
+
+```bash
+make llama-libs LLAMA_BIN_DIR=/absolute/path/to/llama.cpp/build/bin
+make build
+```
+
+After copying, the following files should exist next to the binary in `./bin/`:
+
+- `libllama.so`
+- `libggml*.so`
 
 ## API Cheat Sheet
 

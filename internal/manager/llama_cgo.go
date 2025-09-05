@@ -1,3 +1,5 @@
+//go:build llama
+
 package manager
 
 // cgo link directives for the in-process llama adapter.

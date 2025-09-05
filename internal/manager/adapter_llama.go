@@ -1,3 +1,5 @@
+//go:build llama
+
 package manager
 
 import (
@@ -7,6 +9,9 @@ import (
 
 	llama "github.com/go-skynet/go-llama.cpp"
 )
+
+// llamaBuilt indicates this binary was compiled with real llama support.
+var llamaBuilt = true
 
 // llamaAdapter holds global config used to initialize a model instance
 type llamaAdapter struct {

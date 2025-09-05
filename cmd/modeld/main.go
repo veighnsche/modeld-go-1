@@ -137,6 +137,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to load models: %v", err)
 	}
+	// If the user did not explicitly set a default model but models were found,
+	// pick the first discovered model to avoid startup blockers. The user can
+	// always override via --default-model or config file.
+	if !setFlags["default-model"] && *defaultModel == "" && len(reg) > 0 {
+		*defaultModel = reg[0].ID
+		log.Printf("no --default-model provided; using first discovered model: %s", *defaultModel)
+	}
 	// Use ManagerConfig to pass backpressure knobs
 	mgr := manager.NewWithConfig(manager.ManagerConfig{
 		Registry:      reg,

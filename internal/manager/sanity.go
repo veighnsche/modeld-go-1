@@ -48,6 +48,12 @@ type Check struct {
 // Note: it does not attempt to load the model (avoids heavy I/O at startup).
 func (m *Manager) Preflight() []Check {
 	var checks []Check
+	// Build-time support check
+	if !llamaBuilt {
+		checks = append(checks, Check{Name: "llama_support_built", OK: false, Message: "binary built without llama support; rebuild with CGO_ENABLED=1 -tags=llama"})
+		// Early return: other checks are moot without llama
+		return checks
+	}
 	// Adapter presence
 	if m.adapter == nil {
 		checks = append(checks, Check{Name: "adapter_present", OK: false, Message: "llama adapter not initialized"})
