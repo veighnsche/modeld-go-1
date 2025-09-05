@@ -193,3 +193,124 @@ jobs:
           path: |
             pytest-report.xml
             pytest-output.txt
+
+  e2e-cypress:
+    name: E2E (Cypress UI)
+    runs-on: ubuntu-latest
+    env:
+      CYPRESS_BASE_URL: http://localhost:5173
+      CYPRESS_USE_MOCKS: '1'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install root dev deps (Cypress)
+        run: pnpm install --frozen-lockfile
+
+      - name: Install web deps
+        run: pnpm -C web install --frozen-lockfile
+
+      - name: Build web
+        run: pnpm -C web build
+
+      - name: Start web preview
+        run: pnpm -C web preview --port 5173 &
+
+      - name: Wait for web to be up
+        run: node scripts/poll-url.js "$CYPRESS_BASE_URL" 200 60
+
+      - name: Run Cypress (headless)
+        run: pnpm run test:e2e:run
+
+      - name: Upload Cypress videos and screenshots on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypress-artifacts
+          path: |
+            e2e/artifacts/screenshots
+            e2e/artifacts/videos
+
+  e2e-cypress-live:
+    name: E2E (Cypress UI + Live API)
+    runs-on: ubuntu-latest
+    env:
+      CYPRESS_BASE_URL: http://localhost:5173
+      CYPRESS_USE_MOCKS: '0'
+      API_ADDR: http://localhost:18080
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22.x'
+
+      - name: Install root dev deps (Cypress)
+        run: pnpm install --frozen-lockfile
+
+      - name: Install web deps
+        run: pnpm -C web install --frozen-lockfile
+
+      - name: Build web
+        run: pnpm -C web build
+
+      - name: Start web preview
+        run: pnpm -C web preview --port 5173 &
+
+      - name: Wait for web to be up
+        run: node scripts/poll-url.js "$CYPRESS_BASE_URL" 200 60
+
+      - name: Prepare models dir
+        run: |
+          set -euo pipefail
+          mkdir -p models_tmp
+          touch models_tmp/alpha.gguf
+          touch models_tmp/beta.gguf
+
+      - name: Start API server
+        run: |
+          set -euo pipefail
+          go run ./cmd/modeld --addr :18080 --models-dir $(pwd)/models_tmp --default-model alpha.gguf &
+
+      - name: Wait for API health
+        env:
+          CYPRESS_API_HEALTH_URL: ${{ env.API_ADDR }}/healthz
+        run: node scripts/poll-url.js "$CYPRESS_API_HEALTH_URL" 200 60
+
+      - name: Run Cypress (headless, live mode)
+        env:
+          CYPRESS_API_HEALTH_URL: ${{ env.API_ADDR }}/healthz
+          CYPRESS_API_READY_URL: ${{ env.API_ADDR }}/readyz
+          CYPRESS_API_STATUS_URL: ${{ env.API_ADDR }}/status
+        run: pnpm run test:e2e:run
+
+      - name: Upload Cypress videos and screenshots on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypress-artifacts-live
+          path: |
+            e2e/artifacts/screenshots
+            e2e/artifacts/videos
