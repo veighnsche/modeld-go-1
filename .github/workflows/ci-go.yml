@@ -92,17 +92,20 @@ jobs:
       - name: Static analysis (go vet)
         run: |
           set -euo pipefail
-          go vet ./...
+          env -u CGO_LDFLAGS -u CGO_CFLAGS -u LD_LIBRARY_PATH CGO_ENABLED=0 \
+            go vet ./...
 
       - name: Static analysis (go vet with swagger tag)
         run: |
           set -euo pipefail
-          go vet -tags=swagger ./...
+          env -u CGO_LDFLAGS -u CGO_CFLAGS -u LD_LIBRARY_PATH CGO_ENABLED=0 \
+            go vet -tags=swagger ./...
 
       - name: Generate Swagger docs
         run: |
           set -euo pipefail
-          go run github.com/swaggo/swag/cmd/swag@${SWAG_VERSION} init -g cmd/modeld/main.go -o docs
+          env -u CGO_LDFLAGS -u CGO_CFLAGS -u LD_LIBRARY_PATH CGO_ENABLED=0 \
+            go run github.com/swaggo/swag/cmd/swag@${SWAG_VERSION} init -g cmd/modeld/main.go -o docs
 
       - name: Validate Swagger artifacts exist
         run: |
@@ -123,13 +126,15 @@ jobs:
       - name: Compile (default build)
         run: |
           set -euo pipefail
-          go build ./...
+          env -u CGO_LDFLAGS -u CGO_CFLAGS -u LD_LIBRARY_PATH CGO_ENABLED=0 \
+            go build ./...
 
       - name: Build testctl (thin CLI)
         run: |
           set -euo pipefail
           mkdir -p bin
-          go build -o bin/testctl ./cmd/testctl
+          env -u CGO_LDFLAGS -u CGO_CFLAGS -u LD_LIBRARY_PATH CGO_ENABLED=0 \
+            go build -o bin/testctl ./cmd/testctl
 
       - name: Smoke test testctl CLI
         run: |
@@ -146,7 +151,8 @@ jobs:
       - name: Compile (swagger build tag)
         run: |
           set -euo pipefail
-          go build -tags=swagger ./...
+          env -u CGO_LDFLAGS -u CGO_CFLAGS -u LD_LIBRARY_PATH CGO_ENABLED=0 \
+            go build -tags=swagger ./...
 
       - name: Warm module cache and export data for linter
         run: |
@@ -155,7 +161,8 @@ jobs:
           # Ensure all deps and export data are available to the analyzer
           go list -deps ./... > /dev/null
           # Build packages to populate export data cache; ignore failures to not block
-          go build ./... || true
+          env -u CGO_LDFLAGS -u CGO_CFLAGS -u LD_LIBRARY_PATH CGO_ENABLED=0 \
+            go build ./... || true
 
       - name: Set up Go for linter (1.23.x)
         uses: actions/setup-go@v5
@@ -208,11 +215,13 @@ jobs:
           set -euo pipefail
           pkgs=$(go list ./... | grep -v '^modeld/cmd/' | grep -v '^modeld/docs$' | grep -v '^modeld/internal/testctl$')
           echo "Testing packages:" $pkgs
-          go test $pkgs -covermode=atomic -coverprofile=coverage.out -v
+          env -u CGO_LDFLAGS -u CGO_CFLAGS -u LD_LIBRARY_PATH CGO_ENABLED=0 \
+            go test $pkgs -covermode=atomic -coverprofile=coverage.out -v
 
       - name: Run tests with race detector
         run: |
-          go test -race ./...
+          env -u CGO_LDFLAGS -u CGO_CFLAGS -u LD_LIBRARY_PATH \
+            go test -race ./...
 
       - name: Enforce minimum coverage (80%)
         run: |
