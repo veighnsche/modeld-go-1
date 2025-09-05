@@ -8,8 +8,9 @@ WEB_PORT ?= 5173
 
 .PHONY: build run tidy clean test cover cover-html cover-check e2e-py \
         swagger-install swagger-gen swagger-build swagger-run \
-        web-build web-preview web-dev e2e-cy-mock e2e-cy-live \
-        test-all cli test-cli
+        web-build web-preview web-dev \
+        e2e-cy-auto \
+        test-all cli test-cli testctl-build
 
 build:
 	@mkdir -p bin
@@ -48,6 +49,18 @@ e2e-py:
 SWAG_VERSION ?= v1.16.6
 GOLANGCI_LINT_VERSION ?= v1.56.2
 
+# Helpers
+# Set FORCE_PORT_UNBLOCK=1 to allow killing listeners; default is non-destructive.
+FORCE_PORT_UNBLOCK ?= 0
+# Usage: $(call ensure_port_free, <port>)
+define ensure_port_free
+    if [ "$(FORCE_PORT_UNBLOCK)" = "1" ]; then \
+        bash scripts/ports/ensure_ports.sh --force $(1); \
+    else \
+        bash scripts/ports/ensure_ports.sh $(1); \
+    fi;
+endef
+
 # Swagger / OpenAPI helpers
 swagger-install:
 	@go install github.com/swaggo/swag/cmd/swag@$(SWAG_VERSION)
@@ -75,7 +88,14 @@ lint:
 	@golangci-lint run
 
 test-all:
-	@bash scripts/tests/all.sh
+	@$(MAKE) testctl-build
+	@bin/testctl install all
+	@WEB_PORT=$(WEB_PORT) bin/testctl test all auto
+
+# Build the Go-based test controller CLI
+testctl-build:
+	@mkdir -p bin
+	@go build -o bin/testctl ./cmd/testctl
 
 # Web (Vite + React)
 web-build:
@@ -88,37 +108,15 @@ web-dev:
 	@pnpm -C web dev --port $(WEB_PORT)
 
 # Cypress E2E (UI harness)
-# Mock mode: serves built web with Vite preview and runs Cypress without a live API.
-e2e-cy-mock:
-	@set -euo pipefail; \
-	VITE_USE_MOCKS=1 pnpm -C web build; \
-	VITE_USE_MOCKS=1 pnpm -C web preview --port $(WEB_PORT) & \
-	PREVIEW_PID=$$!; \
-	trap 'kill $$PREVIEW_PID || true' EXIT; \
-	node scripts/cli/poll-url.js http://localhost:$(WEB_PORT) 200 60 || true; \
-	CYPRESS_BASE_URL=http://localhost:$(WEB_PORT) CYPRESS_USE_MOCKS=1 pnpm run test:e2e:run
-
-# Live mode: additionally starts the Go API with a temporary models dir.
-e2e-cy-live:
-	@set -euo pipefail; \
-	pnpm -C web build; \
-	pnpm -C web preview --port $(WEB_PORT) & \
-	PREVIEW_PID=$$!; \
-	trap 'kill $$PREVIEW_PID || true' EXIT; \
-	node scripts/cli/poll-url.js http://localhost:$(WEB_PORT) 200 60 || true; \
-	mkdir -p models_tmp; \
-	touch models_tmp/alpha.gguf models_tmp/beta.gguf; \
-	(go run ./cmd/modeld --addr :18080 --models-dir $$(pwd)/models_tmp --default-model alpha.gguf &) ; \
-	node scripts/cli/poll-url.js http://localhost:18080/healthz 200 60 || true; \
-	CYPRESS_BASE_URL=http://localhost:$(WEB_PORT) \
-	CYPRESS_API_HEALTH_URL=http://localhost:18080/healthz \
-	CYPRESS_API_READY_URL=http://localhost:18080/readyz \
-	CYPRESS_API_STATUS_URL=http://localhost:18080/status \
-	CYPRESS_USE_MOCKS=0 pnpm run test:e2e:run
+# Keep only the heavy, full-suite target here; all other variants live in the CLI.
+e2e-cy-auto:
+	@$(MAKE) testctl-build
+	@bin/testctl test web auto
 
 # Convenience: launch the Bash CLI helper
 cli:
-	@bash scripts/cli/test.sh
+	@$(MAKE) testctl-build
+	@bin/testctl
 
 # Run CLI tests
 test-cli:

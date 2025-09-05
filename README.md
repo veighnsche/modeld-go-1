@@ -457,41 +457,40 @@ Notes:
 - Install once at repo root with pnpm workspaces: `pnpm install`.
 - You can run package scripts in the `web/` workspace via pnpm filtering, e.g. `pnpm -C web build`.
 
-### Bash CLI Helper (`scripts/cli/test.sh`)
+### Go CLI Helper (`bin/testctl`)
 
-For a Node-free way to orchestrate installs and tests, a small Bash CLI is available at `scripts/cli/test.sh`.
-
-Interactive mode: run without arguments to open a simple menu when attached to a TTY.
+A Go-based CLI orchestrates installs and tests across Go, Python, and Cypress. It auto-selects free ports and enforces a strict rule for UI tests: if host models exist in `~/models/llm`, `test web auto` runs against the live API; otherwise it runs in mock mode.
 
 Examples:
 
 ```bash
-# Interactive menu
-bash scripts/cli/test.sh
+# Build the CLI
+make testctl-build
 
 # Install dependencies
-bash scripts/cli/test.sh install:all    # JS, Go, Python
-bash scripts/cli/test.sh install:js
-bash scripts/cli/test.sh install:go
-bash scripts/cli/test.sh install:py
+bin/testctl install all    # JS, Go, Python
+bin/testctl install js
+bin/testctl install go
+bin/testctl install py
 
 # Run tests
-bash scripts/cli/test.sh test:go        # go test ./... -v
-bash scripts/cli/test.sh test:py        # pytest tests/e2e_py
-bash scripts/cli/test.sh test:cy:mock   # Cypress UI (mock mode)
-bash scripts/cli/test.sh test:cy:live   # Cypress UI (live API)
-bash scripts/cli/test.sh test:all       # full suite
+bin/testctl test go                 # go test ./... -v
+bin/testctl test api:py             # pytest tests/e2e_py
+bin/testctl test web mock           # Cypress UI (mock mode)
+bin/testctl test web live:host      # Cypress UI (host models required)
+bin/testctl test web auto           # strict auto mode (host models => live)
+bin/testctl test all auto           # full suite (Go + Py + UI auto)
 ```
 
 Notes:
 
-- The CLI attempts to enable pnpm via corepack if available.
-- Cypress runs rely on environment variables, e.g. `CYPRESS_BASE_URL`, `CYPRESS_USE_MOCKS`, and `CYPRESS_API_*`.
+- The CLI will try to enable pnpm via corepack if available; otherwise ensure pnpm is installed.
+- Cypress baseUrl is set automatically via `CYPRESS_BASE_URL` to the dynamic preview port.
 
 Shortcuts:
 
-- `pnpm run cli` — launches the interactive CLI (`scripts/cli/test.sh`).
-- `make cli` — same as above via Makefile.
+- `pnpm run cli` — runs `bin/testctl`.
+- `make test-all` — installs via testctl and runs the full suite with `test all auto`.
 
 ### Quickstart
 
