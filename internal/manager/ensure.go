@@ -74,15 +74,27 @@ func (m *Manager) EnsureInstance(ctx context.Context, modelID string) error {
 	}
 	m.mu.Unlock()
 
-	select {
-	case <-time.After(50 * time.Millisecond):
-	case <-ctx.Done():
-		m.mu.Lock()
-		m.state = StateError
-		m.err = ctx.Err().Error()
-		m.mu.Unlock()
-		return ctx.Err()
-	}
+    // If real inference is enabled, ensure the runtime (llama-server) is running for this instance.
+    if m.RealInferEnabled {
+        if err := m.ensureLlamaRuntime(ctx, inst, mdl); err != nil {
+            m.mu.Lock()
+            m.state = StateError
+            m.err = err.Error()
+            m.mu.Unlock()
+            return err
+        }
+    } else {
+        // Simulated warmup for placeholder mode
+        select {
+        case <-time.After(50 * time.Millisecond):
+        case <-ctx.Done():
+            m.mu.Lock()
+            m.state = StateError
+            m.err = ctx.Err().Error()
+            m.mu.Unlock()
+            return ctx.Err()
+        }
+    }
 
 	// Commit instance as ready after warmup
 	m.mu.Lock()
