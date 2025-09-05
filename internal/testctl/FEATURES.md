@@ -1,134 +1,230 @@
-# testctl package — Features Overview
+# testctl — Audience-Oriented Feature Overview
 
-This document summarizes the capabilities provided by the `internal/testctl/` package.
+This document summarizes `internal/testctl/` capabilities, organized by environment:
 
-## CLI entrypoints and configuration
+- Go Production
+- Go Testing
+- Go E2E Testing
+- Python E2E Testing
+- Cypress E2E Testing
+- CI Testing
 
-- __Commands__ (`internal/testctl/cli.go`)
-  - `install` — environment setup
-    - `all` — runs `js`, `go`, `py`
-    - `js` — install JavaScript dependencies via `pnpm`
-    - `go` — download Go modules
-    - `py` — set up Python venv and install `tests/e2e_py/requirements.txt`
-    - `llama`, `llama:cuda`, `go-llama.cpp`, `go-llama.cpp:cuda` — install/build llama.cpp with CUDA
-    - `host:docker` — install Docker (Arch Linux focused)
-    - `host:act` — install `act` (GitHub Actions local runner)
-    - `host:all` — `host:docker` + `host:act`
-  - `test` — test runners
-    - `go` — run all Go tests
-    - `api:py` — run Python API E2E tests
-    - `py:haiku` — run only the Python haiku E2E test
-    - `web <mode>` — run Cypress UI tests
-      - `mock` — run UI against mocked API
-      - `live:host` — run UI against local server using host models
-      - `haiku` — run only the Haiku Cypress spec against live backend (no mocks)
-      - `auto` — chooses `live:host` if host models exist, else `mock`
-    - `all auto` — run Go tests, Python tests, then UI tests (auto mode)
-  - `test ci` — run GitHub Actions locally via `act`
-    - `all [runner:catthehacker|runner:default] [-- <extra act args>]`
-    - `one <workflow.yml|yaml> [runner:catthehacker|runner:default] [-- <extra act args>]`
-- __Flags and Env__ (`internal/testctl/cli.go`, `internal/testctl/logenv.go`)
-  - Flags: `--web-port` (default from `WEB_PORT` or `5173`), `--log-level` (`debug|info|warn|error`, default from `TESTCTL_LOG_LEVEL` or `info`)
-  - Environment helpers: `envStr`, `envInt`, `envBool`
-  - Logging levels: `SetLogLevel`, `debug/info/warn/errl` with RFC3339 timestamps
+It focuses on what you can do, with concise pointers to implementation files.
 
-## Installers
+## Quick map of CLI (internal/testctl/cli.go)
 
-- __JavaScript__ (`internal/testctl/install_js.go`)
-  - Ensures `pnpm` is available (attempts `corepack enable`/`prepare`), then runs `pnpm install` in repo root and `web/` with `--frozen-lockfile`.
-- __Go__ (`internal/testctl/install.go`)
-  - `go mod download`
-- __Python__ (`internal/testctl/install.go`)
-  - Creates `tests/e2e_py/.venv`, runs `python3 -m venv` and installs `requirements.txt`.
-- __Host: Docker__ (Arch Linux focused) (`internal/testctl/install_host.go`)
-  - Installs `docker` via `pacman` if missing, enables service, adds current user to `docker` group, smoke checks `docker --version`.
-- __Host: act__ (local GitHub Actions runner) (`internal/testctl/install_host.go`)
-  - Prefers AUR via `yay` or `paru` (`act-bin` or `act`), else falls back to downloading and extracting the official tarball to `/usr/local/bin`.
-- __Llama.cpp with CUDA__ (`internal/testctl/install_llama.go`)
-  - Installs prerequisites on Arch (base-devel, cmake, ninja, cuda, etc.).
-  - Clones/updates `~/src/llama.cpp`, configures CMake with CUDA, prefers `g++-14` as host compiler if available.
-  - Builds `libllama.so` in `build-cuda14` and prints next-step env exports (`LLAMA_CPP_DIR`, `CGO_CFLAGS`, `CGO_LDFLAGS`, `LD_LIBRARY_PATH`, `CGO_ENABLED`).
+- install
+  - all — [Dev]
+  - nodejs — [Cypress]
+  - go — [Go Test]
+  - py — [Py E2E]
+  - llama | llama:cuda | go-llama.cpp | go-llama.cpp:cuda — [Go Prod]
+  - host:act — [CI]
+  - host:docker — [CI]
+  - host:all — [CI]
+- test
+  - go — [Go Test] (+ includes [Go E2E])
+  - api:py — [Py E2E]
+  - py:haiku — [Py E2E]
+  - web <mock|live:host|haiku|auto> — [Cypress]
+  - all auto — [Orchestration] (Go → Py → Web)
+- test ci
+  - all [runner:catthehacker|runner:default] [-- <extra act args>] — [CI]
+  - one <workflow.yml|yaml> [runner:…] [-- <extra act args>] — [CI]
 
-## Test runners
+__Flags & logging__ (`cli.go`, `logenv.go`)
+- --web-port (defaults to `WEB_PORT` or `5173`)
+- --log-level `debug|info|warn|error` (defaults to `TESTCTL_LOG_LEVEL` or `info`)
+- Logging helpers with RFC3339 timestamps; env helpers `envStr/envInt/envBool`
 
-- __Go tests__ (`internal/testctl/tests.go`)
-  - `go test ./... -v`
-- __Python E2E tests__ (`internal/testctl/tests.go`)
-  - Uses venv `tests/e2e_py/.venv/bin/pytest`, auto-installs venv if missing.
-- __Python Haiku test__ (`internal/testctl/tests.go`)
-  - Runs only `tests/e2e_py/test_haiku.py` with `-s` to print the poem in logs.
+Note: `test web ...` subcommands are exclusively for Cypress E2E testing (not a general dev/prod server).
+Note: `install host:docker` and `install host:all` are CI-focused installers (not needed for general dev/prod).
 
-## Web UI E2E suites (Cypress)
+__Legend__
+- [Go Prod] Go Production
+- [Go Test] Go Testing
+- [Go E2E] Go E2E Testing
+- [Py E2E] Python E2E Testing
+- [Cypress] Cypress E2E Testing
+- [CI] CI Testing (via `act` and host tools)
+- [Dev] Development utilities
+- [Orchestration] Convenience combined runner
 
-- __Shared helpers__ (`internal/testctl/web_helpers.go`)
-  - `buildWebWith(env)` — builds `web/` with provided env.
-  - `startPreview(port)` — starts Vite preview on given port; tracked for cleanup.
-  - `runCypress(env, args...)` — runs default `pnpm run test:e2e:run` or a custom invocation (e.g., `xvfb-run ... cypress run`).
-  - `findLlamaBin()` — searches common locations/`PATH` for `llama-server`.
-- __Mock mode__ (`internal/testctl/web_mock.go`)
-  - Picks a free web port, builds with `VITE_USE_MOCKS=1`, starts preview, waits for readiness, runs Cypress with `CYPRESS_BASE_URL` and `CYPRESS_USE_MOCKS=1`.
-- __Live: Host mode__ (`internal/testctl/web_live.go`)
-  - Requires host models (`~/models/llm/*.gguf`).
-  - Chooses API port (prefers `18080`) and web port (prefers `--web-port`).
-  - Starts `go run ./cmd/modeld` with `--models-dir` and `--default-model`, enables CORS, waits for `/healthz`.
-  - Builds web with `VITE_USE_MOCKS=0`, `VITE_API_BASE_URL`, `VITE_SEND_STREAM_FIELD=true`, starts preview, runs Cypress.
-- __Haiku Live: Host mode (no mocks)__ (`internal/testctl/web_haiku.go`)
-  - Same as Live:Host, but enables `--real-infer` and passes `--llama-bin` (via `findLlamaBin()`).
-  - Runs only `e2e/specs/haiku_center.cy.ts` via a custom Cypress command (headless with `xvfb-run`).
+---
 
-## Filesystem, ports, and processes utilities
+## Go Production
 
-- __Filesystem helpers__ (`internal/testctl/fs.go`)
-  - `firstGGUF(dir)` — returns first `*.gguf` model filename in a directory.
-  - `hasHostModels()` — detects presence of `~/models/llm/*.gguf`.
-  - `homeDir()` — resolves home directory from `HOME` or OS.
-- __Ports & HTTP readiness__ (`internal/testctl/ports.go`)
-  - `chooseFreePort()` — asks kernel for a free TCP port.
-  - `isPortBusy(port)` — quick TCP connect check.
-  - `waitHTTP(url, want, timeout)` — poll until HTTP returns desired status code.
-  - `ensurePorts(ports, force)` — verify/optionally free ports via `fuser -k`.
-  - `preferOrFree(desired)` — use desired if free, else allocate a free port.
-- __Process management__ (`internal/testctl/process.go`)
-  - `ProcManager` to track and kill spawned processes.
-  - Package-level helpers: `TrackProcess(cmd)`, `killProcesses()` (delegates to manager).
-- __Command execution__ (`internal/testctl/executil.go`)
-  - `RunCmd(ctx, Cmd)` — unified runner supporting env/dir and streaming.
-  - Helpers: `runCmdVerbose`, `runCmdStreaming`, `runEnvCmdStreaming`.
+Focus: preparing model backends and host models for running the Go service with real inference.
 
-## CI integration via act
+### Install
 
-- __Workflow discovery__ (`internal/testctl/ci.go`)
-  - `listWorkflows()` — lists `.yml|.yaml` under `.github/workflows/`.
-- __Run single workflow__ (`internal/testctl/ci.go`)
-  - `runCIWorkflow(workflowFile, useCatthehacker, extraArgs)` — adds `-P` mappings to catthehacker images when requested.
-- __Run all workflows__ (`internal/testctl/ci.go`)
-  - `runCIAll(useCatthehacker, extraArgs)` — iterates all discovered workflows.
-- __CLI conveniences__ (`internal/testctl/cli.go`)
-  - Supports `runner:catthehacker` (default) or `runner:default` token.
-  - Supports passing extra `act` arguments after `--`.
+- Llama.cpp (CUDA variants supported) — `install llama | llama:cuda | go-llama.cpp | go-llama.cpp:cuda`
+  - Implementation: `internal/testctl/install_llama.go`
+  - Notes: Arch-focused prerequisites; builds `libllama.so`; prints env exports (`LLAMA_CPP_DIR`, `CGO_CFLAGS`, `CGO_LDFLAGS`, `LD_LIBRARY_PATH`, `CGO_ENABLED`).
+- Host models
+  - Expected at `~/models/llm/*.gguf` (detected by `hasHostModels()` in `fs.go`).
 
-## OS detection and platform assumptions
+### Environment
 
-- __Arch-like detection__ (`internal/testctl/os_helpers.go`)
-  - `isArchLike()` — inspects `/etc/os-release` for `ID`/`ID_LIKE` containing `arch`.
-- __Platform focus__
-  - Host installers target Arch Linux; on other OSes, users are prompted to install manually where applicable.
+- `TESTCTL_LOG_LEVEL` — logging verbosity
 
-## Testability and indirection
+### CLI: commands & options
 
-- __Action indirection for stubbing__ (`internal/testctl/actions.go`)
-  - Exposes package-level function variables (e.g., `fnInstallJS`, `fnRunGoTests`, `fnTestWebMock`, `fnRunCIAll`, etc.) to allow tests to stub behavior without invoking real side effects.
+- `install llama`
+- `install llama:cuda`
+- `install go-llama.cpp`
+- `install go-llama.cpp:cuda`
+  - No additional parameters; see printed env exports after build.
+- Host models expected at `~/models/llm/*.gguf`
 
-## Notable environment variables used at runtime
+### Refs
 
-- __Web build__
-  - `VITE_USE_MOCKS` — `1` for mock, `0` for live
-  - `VITE_API_BASE_URL` — backend API base URL
-  - `VITE_SEND_STREAM_FIELD` — enable stream field in requests
-- __Cypress__
-  - `CYPRESS_BASE_URL` — target UI URL
-  - `CYPRESS_USE_MOCKS` — signals mock mode to specs
-  - `CYPRESS_API_READY_URL`, `CYPRESS_API_STATUS_URL` — used by Haiku live flow
-- __General__
-  - `WEB_PORT` — default for `--web-port`
-  - `TESTCTL_LOG_LEVEL` — default for `--log-level`
+- Installers: `internal/testctl/install_llama.go`
+- FS helpers: `internal/testctl/fs.go`
+
+---
+
+## Go Testing
+
+Focus: unit and integration tests for Go code.
+
+- Run — `test go` → `go test ./... -v` (`internal/testctl/tests.go`)
+- Coverage and verbosity flags can be passed via standard `go test` args.
+
+### CLI: commands & options
+
+- `test go`
+  - Runs `go test ./... -v`
+  - No custom flags via `testctl`; use `go test` locally as needed for extra options.
+
+### Refs
+
+- Runner: `internal/testctl/tests.go`
+
+## Go E2E Testing
+
+Focus: end-to-end Go tests under `internal/e2e/` (executed by the same `test go`).
+
+- Included in `test go`.
+- Utilities available: ports, processes, fs helpers
+  - `ports.go`: `chooseFreePort`, `waitHTTP`, `preferOrFree`
+  - `process.go`: `ProcManager`, `TrackProcess`, `killProcesses`
+  - `fs.go`: `firstGGUF`, `hasHostModels`
+
+### CLI: commands & options
+
+- `test go`
+  - Executes E2E tests under `internal/e2e/` as part of the full Go test suite.
+
+### Refs
+
+- Suites: `internal/e2e/*.go`
+- Utilities: `internal/testctl/ports.go`, `internal/testctl/process.go`, `internal/testctl/fs.go`
+
+## Python E2E Testing
+
+Focus: exercising the HTTP API from Python.
+
+- Install — `install py` (creates venv at `tests/e2e_py/.venv`, installs `requirements.txt`) (`install.go`)
+- Run all — `test api:py` (auto-creates venv if missing) (`tests.go`)
+- Run haiku-only — `test py:haiku` (`tests.go`)
+
+### CLI: commands & options
+
+- `install py`
+  - Creates venv at `tests/e2e_py/.venv`, installs `requirements.txt`.
+- `test api:py`
+  - Runs all Python E2E tests using the venv; auto-creates venv if missing.
+- `test py:haiku`
+  - Runs only the haiku test and prints poem output (`-s`).
+
+### Refs
+
+- Installer: `internal/testctl/install.go`
+- Runner: `internal/testctl/tests.go`
+- Tests: `tests/e2e_py/`
+
+## Cypress E2E Testing
+
+Focus: UI end-to-end testing. Web commands are Cypress-only and not a general dev/prod server.
+
+- Install (JS deps) — `install nodejs` (ensures pnpm; installs root and `web/` with frozen lockfiles) (`install_nodejs.go`)
+- Run — `test web <mock|live:host|haiku|auto>`
+  - mock: builds with mocks, previews, runs Cypress (`web_mock.go`)
+  - live:host: requires host `*.gguf` models; starts API; runs Cypress (`web_live.go`)
+  - haiku: live host + real infer; runs haiku spec only (`web_haiku.go`)
+- Env vars: `VITE_USE_MOCKS`, `VITE_API_BASE_URL`, `VITE_SEND_STREAM_FIELD`, `CYPRESS_BASE_URL`, `CYPRESS_USE_MOCKS`, `CYPRESS_API_READY_URL`, `CYPRESS_API_STATUS_URL`
+
+### CLI: commands & options
+
+- `install nodejs`
+  - Ensures `pnpm` via `corepack`; installs root and `web/` deps with `--frozen-lockfile`.
+- `test web mock`
+  - Builds with mocks; starts preview; runs Cypress against preview.
+- `test web live:host`
+  - Requires host `*.gguf` models; starts local API; builds without mocks; runs Cypress.
+- `test web haiku`
+  - Like `live:host` but runs only the haiku spec with real infer.
+- `test web auto`
+  - Chooses `live:host` if host models exist, else `mock`.
+- Options
+  - `--web-port <port>` (defaults to `WEB_PORT` or `5173`) — used for the Vite preview.
+
+### Refs
+
+- Installer: `internal/testctl/install_nodejs.go`
+- Web helpers: `internal/testctl/web_helpers.go`
+- Modes: `internal/testctl/web_mock.go`, `internal/testctl/web_live.go`, `internal/testctl/web_haiku.go`
+
+## CI Testing
+
+Focus: running GitHub Actions locally and preparing a CI-like host.
+
+- Install CI tools
+  - GitHub Actions local runner — `install host:act` (`install_host.go`)
+  - Docker for CI — `install host:docker` (CI-only) (`install_host.go`)
+  - CI combo — `install host:all` (docker + act; CI-only) (`install_host.go`)
+- Run workflows with `act` (`ci.go`)
+  - All — `test ci all [runner:catthehacker|runner:default] [-- <extra act args>]`
+  - One — `test ci one <workflow.yml|yaml> [runner:…] [-- <extra act args>]`
+  - Discovery — workflows under `.github/workflows/` (`listWorkflows()`)
+
+### CLI: commands & options
+
+- `install host:act` — install GitHub Actions local runner
+- `install host:docker` — install Docker (CI-only)
+- `install host:all` — docker + act (CI-only)
+- `test ci all [runner:catthehacker|runner:default] [-- <extra act args>]`
+  - Runner token selects image mappings; extra args forwarded to `act`.
+- `test ci one <workflow.yml|yaml> [runner:catthehacker|runner:default] [-- <extra act args>]`
+  - Executes a single workflow file from `.github/workflows/`.
+
+### Refs
+
+- CLI: `internal/testctl/cli.go`
+- Act integration: `internal/testctl/ci.go`
+- Workflows: `.github/workflows/*.yml|yaml`
+
+## Development Utilities
+
+Focus: local iteration helpers.
+
+- One-shot setup — `install all` (runs `nodejs`, `go`, `py`)
+- Web helpers (`web_helpers.go`): `buildWebWith`, `startPreview`, `runCypress`, `findLlamaBin`
+- Exec (`executil.go`): `RunCmd`, `runCmdVerbose`, `runCmdStreaming`, `runEnvCmdStreaming`
+- Testability indirection (`actions.go`): `fnInstallJS`, `fnRunGoTests`, `fnTestWebMock`, `fnRunCIAll`
+- OS detection (`os_helpers.go`): `isArchLike()` (installers target Arch-like systems)
+
+### CLI: commands & options
+
+- `install all` — runs `install nodejs`, `install go`, `install py`
+- Logging level for all commands: `--log-level debug|info|warn|error` (or `TESTCTL_LOG_LEVEL`)
+
+### Refs
+
+- CLI and flags: `internal/testctl/cli.go`, `internal/testctl/logenv.go`
+- Execution: `internal/testctl/executil.go`
+- Test indirection: `internal/testctl/actions.go`
+- OS detection: `internal/testctl/os_helpers.go`
+
+
