@@ -48,4 +48,6 @@ type Instance struct {
 	Adapter Adapter
 	// Runtime endpoint info (when real inference is enabled)
 	Port int
+	// Process handle for managed runtime (e.g., llama-server)
+	Proc interface{}
 }
