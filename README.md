@@ -382,7 +382,7 @@ This repo includes a minimal React-based visual test harness and a Cypress E2E s
   - Config: `e2e/cypress.config.ts`
   - Specs: `e2e/specs/*.cy.ts`
   - Support: `e2e/support/`
-- `scripts/poll-url.js` — small Node helper to poll a URL until it returns an expected status
+- `scripts/cli/poll-url.js` — small Node helper to poll a URL until it returns an expected status
 - `package.json` (root) — orchestration scripts (with placeholders to adapt to your environment)
 
 ### Web Harness
@@ -453,9 +453,40 @@ The following scripts are provided and ready to use:
 
 Notes:
 
-- `scripts/poll-url.js` is used before Cypress to avoid race conditions.
+- `scripts/cli/poll-url.js` is used before Cypress to avoid race conditions.
 - Install once at repo root with pnpm workspaces: `pnpm install`.
 - You can run package scripts in the `web/` workspace via pnpm filtering, e.g. `pnpm -C web build`.
+
+### Bash CLI Helper (`scripts/cli/test.sh`)
+
+For a Node-free way to orchestrate installs and tests, a small Bash CLI is available at `scripts/cli/test.sh`.
+
+Interactive mode: run without arguments to open a simple menu when attached to a TTY.
+
+Examples:
+
+```bash
+# Interactive menu
+bash scripts/cli/test.sh
+
+# Install dependencies
+bash scripts/cli/test.sh install:all    # JS, Go, Python
+bash scripts/cli/test.sh install:js
+bash scripts/cli/test.sh install:go
+bash scripts/cli/test.sh install:py
+
+# Run tests
+bash scripts/cli/test.sh test:go        # go test ./... -v
+bash scripts/cli/test.sh test:py        # pytest tests/e2e_py
+bash scripts/cli/test.sh test:cy:mock   # Cypress UI (mock mode)
+bash scripts/cli/test.sh test:cy:live   # Cypress UI (live API)
+bash scripts/cli/test.sh test:all       # full suite
+```
+
+Notes:
+
+- The CLI attempts to enable pnpm via corepack if available.
+- Cypress runs rely on environment variables, e.g. `CYPRESS_BASE_URL`, `CYPRESS_USE_MOCKS`, and `CYPRESS_API_*`.
 
 ### Quickstart
 

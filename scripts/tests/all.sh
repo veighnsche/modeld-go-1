@@ -8,10 +8,10 @@ step() { echo -e "\n==== $* ====\n"; }
 
 # Install all deps first
 step "Install all dependencies (JS, Go, Python)"
-bash scripts/install-all.sh
+bash scripts/install/all.sh
 
 # Run tests without installing again
 step "Run full test suite (no install)"
-bash scripts/test-all-no-install.sh
+bash scripts/tests/all-no-install.sh
 
 step "All test suites completed successfully"

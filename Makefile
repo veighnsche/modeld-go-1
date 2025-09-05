@@ -75,7 +75,7 @@ lint:
 	@golangci-lint run
 
 test-all:
-	@bash scripts/test-all.sh
+	@bash scripts/tests/all.sh
 
 # Web (Vite + React)
 web-build:
@@ -95,7 +95,7 @@ e2e-cy-mock:
 	pnpm -C web preview --port $(WEB_PORT) & \
 	PREVIEW_PID=$$!; \
 	trap 'kill $$PREVIEW_PID || true' EXIT; \
-	node scripts/poll-url.js http://localhost:$(WEB_PORT) 200 60 || true; \
+	node scripts/cli/poll-url.js http://localhost:$(WEB_PORT) 200 60 || true; \
 	CYPRESS_BASE_URL=http://localhost:$(WEB_PORT) CYPRESS_USE_MOCKS=1 pnpm run test:e2e:run
 
 # Live mode: additionally starts the Go API with a temporary models dir.
@@ -105,11 +105,11 @@ e2e-cy-live:
 	pnpm -C web preview --port $(WEB_PORT) & \
 	PREVIEW_PID=$$!; \
 	trap 'kill $$PREVIEW_PID || true' EXIT; \
-	node scripts/poll-url.js http://localhost:$(WEB_PORT) 200 60 || true; \
+	node scripts/cli/poll-url.js http://localhost:$(WEB_PORT) 200 60 || true; \
 	mkdir -p models_tmp; \
 	touch models_tmp/alpha.gguf models_tmp/beta.gguf; \
 	(go run ./cmd/modeld --addr :18080 --models-dir $$(pwd)/models_tmp --default-model alpha.gguf &) ; \
-	node scripts/poll-url.js http://localhost:18080/healthz 200 60 || true; \
+	node scripts/cli/poll-url.js http://localhost:18080/healthz 200 60 || true; \
 	CYPRESS_BASE_URL=http://localhost:$(WEB_PORT) \
 	CYPRESS_API_HEALTH_URL=http://localhost:18080/healthz \
 	CYPRESS_API_READY_URL=http://localhost:18080/readyz \

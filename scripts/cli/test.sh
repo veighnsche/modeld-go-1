@@ -26,6 +26,9 @@ Commands:
   help               Show this help
   --version          Print CLI version
 
+Interactive mode:
+  Run without arguments to open an interactive menu (when attached to a TTY).
+
 Prerequisites:
   - Go toolchain (go)
   - Python 3 (python3)
@@ -38,34 +41,66 @@ Environment variables (used by downstream scripts):
   - CYPRESS_API_*       API health/ready/status URLs in live mode
 
 Examples:
-  bash scripts/test-cli.sh install:all
-  bash scripts/test-cli.sh test:go
-  bash scripts/test-cli.sh test:cy:mock
-  bash scripts/test-cli.sh test:all
+  bash scripts/cli/test.sh install:all
+  bash scripts/cli/test.sh test:go
+  bash scripts/cli/test.sh test:cy:mock
+  bash scripts/cli/test.sh test:all
 
 Exit codes:
   0 on success; non-zero if any subcommand fails.
 USAGE
 }
 
+# Interactive menu if no arguments and running in a TTY
+if [[ $# -eq 0 && -t 0 ]]; then
+  echo "Select an action:"
+  PS3="> "
+  options=(
+    "install:all"
+    "install:js"
+    "install:go"
+    "install:py"
+    "test:go"
+    "test:py"
+    "test:cy:mock"
+    "test:cy:live"
+    "test:all"
+    "help"
+    "quit"
+  )
+  select opt in "${options[@]}"; do
+    case "$opt" in
+      quit)
+        exit 0
+        ;;
+      "" )
+        echo "Invalid selection" >&2
+        ;;
+      *)
+        exec bash "$0" "$opt"
+        ;;
+    esac
+  done
+fi
+
 cmd=${1:-help}
 shift || true
 
 case "$cmd" in
   install:all)
-    bash scripts/install-all.sh "$@"
+    bash scripts/install/all.sh "$@"
     ;;
   install:js)
-    bash scripts/install-js.sh "$@"
+    bash scripts/install/js.sh "$@"
     ;;
   install:go)
-    bash scripts/install-go.sh "$@"
+    bash scripts/install/go.sh "$@"
     ;;
   install:py)
-    bash scripts/install-py.sh "$@"
+    bash scripts/install/py.sh "$@"
     ;;
   test:go)
-    bash scripts/test-go.sh "$@"
+    bash scripts/tests/go.sh "$@"
     ;;
   test:py)
     make e2e-py "$@"
@@ -77,7 +112,7 @@ case "$cmd" in
     make e2e-cy-live "$@"
     ;;
   test:all)
-    bash scripts/test-all.sh "$@"
+    bash scripts/tests/all.sh "$@"
     ;;
   --version)
     echo "test-cli version $VERSION"

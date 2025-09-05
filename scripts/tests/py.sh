@@ -7,7 +7,7 @@ VENV_DIR="$PY_DIR/.venv"
 cd "$PY_DIR"
 if [[ ! -d "$VENV_DIR" ]]; then
   echo "Python venv not found; running installer..."
-  bash "$ROOT_DIR/scripts/install-py.sh"
+  bash "$ROOT_DIR/scripts/install/py.sh"
 fi
 
 # shellcheck disable=SC1091
