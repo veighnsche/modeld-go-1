@@ -72,3 +72,19 @@ func ensurePorts(ports []int, force bool) error {
 	}
 	return nil
 }
+
+// preferOrFree returns the desired port if free; otherwise chooses a free port.
+func preferOrFree(desired int) (int, error) {
+	if desired <= 0 {
+		return chooseFreePort()
+	}
+	if busy, _ := isPortBusy(desired); busy {
+		p, err := chooseFreePort()
+		if err != nil {
+			return 0, err
+		}
+		warn("[ports] %d busy; using free port %d", desired, p)
+		return p, nil
+	}
+	return desired, nil
+}

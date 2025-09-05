@@ -22,8 +22,8 @@ func usage() {
 	fmt.Println("  test py:haiku")
 	fmt.Println("  test web mock|live:host|auto|haiku")
 	fmt.Println("  test all auto")
-	fmt.Println("  test ci all [runner:catthehacker|runner:default]")
-	fmt.Println("  test ci one <workflow.yml|yaml> [runner:catthehacker|runner:default]")
+	fmt.Println("  test ci all [runner:catthehacker|runner:default] [-- <extra act args>]")
+	fmt.Println("  test ci one <workflow.yml|yaml> [runner:catthehacker|runner:default] [-- <extra act args>]")
 }
 
 // Run dispatches the CLI command. It returns an error instead of exiting,
@@ -135,25 +135,41 @@ func Run(args []string, cfg *Config) error {
 				}
 				return false
 			}
+			// capture any extra act args after a "--" delimiter
+			parseExtra := func(tokens []string) ([]string, []string) {
+				for i, t := range tokens {
+					if t == "--" {
+						return tokens[:i], tokens[i+1:]
+					}
+				}
+				return tokens, nil
+			}
 			switch args[2] {
 			case "all":
+				var tail []string
 				if len(args) >= 4 {
-					_ = parseRunner(args[3])
+					tail = args[3:]
 				}
-				return fnRunCIAll(useCat)
+				tail, extra := parseExtra(tail)
+				if len(tail) >= 1 {
+					_ = parseRunner(tail[0])
+				}
+				return fnRunCIAll(useCat, extra)
 			case "one":
 				if len(args) < 4 {
 					return fmt.Errorf("test ci one requires a workflow file name, e.g., ci-go.yml")
 				}
 				wf := args[3]
-				if len(args) >= 5 {
-					_ = parseRunner(args[4])
+				tail := args[4:]
+				tail, extra := parseExtra(tail)
+				if len(tail) >= 1 {
+					_ = parseRunner(tail[0])
 				}
 				// If only a basename given, qualify it under .github/workflows
 				if !strings.Contains(wf, "/") && !strings.HasPrefix(wf, ".github/workflows/") {
 					wf = ".github/workflows/" + wf
 				}
-				return fnRunCIWorkflow(wf, useCat)
+				return fnRunCIWorkflow(wf, useCat, extra)
 			default:
 				return fmt.Errorf("unknown test ci mode: %s", args[2])
 			}
@@ -214,6 +230,10 @@ func MainWithArgs(args []string) int {
 	}
 	fs := flag.NewFlagSet("testctl", flag.ContinueOnError)
 	cfg, rest := ParseConfigWith(fs, args)
+	// Apply log level early so subsequent logs honor it
+	if cfg != nil {
+		SetLogLevel(cfg.LogLvl)
+	}
 	if len(rest) == 0 {
 		usage()
 		return 2

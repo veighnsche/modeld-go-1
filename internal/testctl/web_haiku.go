@@ -18,27 +18,12 @@ func testWebHaikuHost(cfg *Config) error {
         return errors.New("host models not found in $HOME/models/llm; cannot run haiku live test")
     }
     info("==== Run Cypress (Haiku Live:Host) ====")
-
     // determine API port (prefer 18080, else free)
-    apiPort := 18080
-    if busy, _ := isPortBusy(apiPort); busy {
-        p, err := chooseFreePort()
-        if err != nil {
-            return err
-        }
-        warn("[ports] %d busy; using free port %d for API", apiPort, p)
-        apiPort = p
-    }
+    apiPort, err := preferOrFree(18080)
+    if err != nil { return err }
     // determine web preview port (prefer cfg.WebPort, else free)
-    webPort := cfg.WebPort
-    if busy, _ := isPortBusy(webPort); busy {
-        p, err := chooseFreePort()
-        if err != nil {
-            return err
-        }
-        warn("[ports] %d busy; using free port %d for preview", webPort, p)
-        webPort = p
-    }
+    webPort, err := preferOrFree(cfg.WebPort)
+    if err != nil { return err }
     defer func() { _ = killProcesses() }()
 
     // Start server with host models and enable real inference
@@ -59,25 +44,25 @@ func testWebHaikuHost(cfg *Config) error {
     if err := srv.Start(); err != nil {
         return err
     }
+    // Track for unified cleanup
+    TrackProcess(srv)
     defer func() { _ = srv.Process.Kill() }()
     if err := waitHTTP(fmt.Sprintf("http://localhost:%d/healthz", apiPort), 200, 60*time.Second); err != nil {
         return err
     }
 
     // Build and preview without mocks, pointing to API
-    if err := runEnvCmdStreaming(context.Background(), map[string]string{
+    if err := buildWebWith(map[string]string{
         "VITE_USE_MOCKS":         "0",
         "VITE_API_BASE_URL":      fmt.Sprintf("http://localhost:%d", apiPort),
         "VITE_SEND_STREAM_FIELD": "true",
-    }, "pnpm", "-C", "web", "build"); err != nil {
+    }); err != nil {
         return err
     }
     pvCtx, pvCancel := context.WithCancel(context.Background())
     defer pvCancel()
-    preview := exec.CommandContext(pvCtx, "pnpm", "-C", "web", "preview", "--port", fmt.Sprint(webPort))
-    preview.Stdout = os.Stdout
-    preview.Stderr = os.Stderr
-    if err := preview.Start(); err != nil {
+    preview, err := startPreview(pvCtx, webPort)
+    if err != nil {
         return err
     }
     defer func() { _ = preview.Process.Kill() }()
@@ -86,9 +71,10 @@ func testWebHaikuHost(cfg *Config) error {
     }
 
     // Run Cypress headless for only the haiku spec (centered), exporting API urls for optional checks
-    return runEnvCmdStreaming(context.Background(), map[string]string{
+    return runCypress(map[string]string{
         "CYPRESS_BASE_URL":       fmt.Sprintf("http://localhost:%d", webPort),
         "CYPRESS_API_READY_URL":  fmt.Sprintf("http://localhost:%d/readyz", apiPort),
         "CYPRESS_API_STATUS_URL": fmt.Sprintf("http://localhost:%d/status", apiPort),
     }, "xvfb-run", "-a", "pnpm", "exec", "cypress", "run", "--config-file", "e2e/cypress.config.ts", "--spec", "e2e/specs/haiku_center.cy.ts")
 }
+

@@ -35,7 +35,8 @@ func listWorkflows() ([]string, error) {
 
 // runCIWorkflow runs a single workflow file with act. If useCatthehacker is true,
 // we map ubuntu runners to the corresponding catthehacker images for better compatibility.
-func runCIWorkflow(workflowFile string, useCatthehacker bool) error {
+// extraArgs are appended to the act invocation (e.g., ["-j"], ["-P", "self-hosted=myimage"]).
+func runCIWorkflow(workflowFile string, useCatthehacker bool, extraArgs []string) error {
 	if _, err := exec.LookPath("act"); err != nil {
 		return fmt.Errorf("'act' is required. Install via 'testctl install host:act' or your package manager: %w", err)
 	}
@@ -49,18 +50,21 @@ func runCIWorkflow(workflowFile string, useCatthehacker bool) error {
 			"-P", "ubuntu-20.04=ghcr.io/catthehacker/ubuntu:act-20.04",
 		)
 	}
+	if len(extraArgs) > 0 {
+		args = append(args, extraArgs...)
+	}
 	info("[ci] Running workflow: %s", workflowFile)
 	return runCmdStreaming(context.Background(), "act", args...)
 }
 
 // runCIAll runs all workflows discovered under .github/workflows.
-func runCIAll(useCatthehacker bool) error {
+func runCIAll(useCatthehacker bool, extraArgs []string) error {
 	files, err := listWorkflows()
 	if err != nil {
 		return err
 	}
 	for _, f := range files {
-		if err := runCIWorkflow(f, useCatthehacker); err != nil {
+		if err := runCIWorkflow(f, useCatthehacker, extraArgs); err != nil {
 			return err
 		}
 	}
