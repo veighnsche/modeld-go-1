@@ -48,6 +48,7 @@ Requirements: Go 1.22+
 - `make build` — builds `bin/modeld`
 - `make run` — runs `go run ./cmd/modeld`
 - `make tidy` — `go mod tidy`
+- `make lint` — runs golangci-lint (install with `make install-golangci-lint`)
 
 ## Running
 
@@ -82,6 +83,25 @@ go run ./cmd/modeld \
   --vram-margin-mb 1024 \
   --default-model llama-3.1-8b-q4_k_m.gguf
 ```
+
+### Swagger (OpenAPI) Docs
+
+This project includes Swagger annotations and can serve a Swagger UI when built with the `swagger` build tag.
+
+- Generate docs (outputs to `docs/`):
+  - `make swagger-gen`
+
+- Run with Swagger UI enabled:
+  - `make swagger-run`
+  - Open `http://localhost:8080/swagger/index.html`
+  - JSON spec at `http://localhost:8080/swagger/doc.json`
+
+- Build a swagger-enabled binary:
+  - `make swagger-build`
+
+Notes:
+- Default builds do not include the Swagger UI routes. The `internal/httpapi/MountSwagger()` no-op is replaced by a UI mount when using `-tags=swagger`.
+- The `Makefile` pins `swag` to a specific version for reproducible docs; CI also regenerates and verifies docs are up to date.
 
 ## Configuration File
 
@@ -199,6 +219,9 @@ Endpoints:
       -H 'Content-Type: application/json' \
       -d '{"model":"llama-3.1-8b-q4_k_m.gguf","prompt":"Write a haiku about Go."}'
     ```
+  - Optional logging overrides (per-request):
+    - Query: `?log=off|error|info|debug`
+    - Headers: `X-Log-Level: off|error|info|debug`, `X-Log-Infer: 1`
   - Error status codes:
     - 404 when model not found
     - 429 when instance queue/backpressure limits are hit
@@ -276,8 +299,13 @@ Common endpoints exercised include `/healthz`, `/readyz`, `/models`, `/status`, 
 GitHub Actions runs on pushes and pull requests:
 
 - Go job
-  - Runs `go test ./...` with coverage and enforces a minimum of 80%.
-  - Uploads `coverage.out` and sends coverage to Codecov if `CODECOV_TOKEN` is configured.
+  - Module hygiene: runs `go mod tidy` and fails if it changes `go.mod`/`go.sum`.
+  - Formatting: fails if `gofmt` finds unformatted files.
+  - Static analysis: `go vet` (default and with `-tags=swagger`).
+  - Swagger docs: regenerates with a pinned `swag` version, validates `docs/` artifacts exist, and fails if generation produces a diff vs. the repo (keeps Swagger docs in sync).
+  - Build: compiles default and `-tags=swagger` variants.
+  - Tests: runs `go test` with coverage and race detector; enforces 80%+ coverage and uploads to Codecov.
+  - Lint: runs `golangci-lint` via the official GitHub Action with a pinned version.
 
 - Python E2E job
   - Matrix across Python 3.10, 3.11, 3.12.
