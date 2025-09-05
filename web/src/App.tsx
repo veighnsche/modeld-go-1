@@ -2,6 +2,9 @@ import React, { Suspense, lazy } from 'react'
 import { Link, Navigate, Route, Routes } from 'react-router-dom'
 import InferPage from './pages/InferPage'
 import HealthPage from './pages/HealthPage'
+const ReadyPage = lazy(() => import('./pages/ReadyPage'))
+const ModelsPage = lazy(() => import('./pages/ModelsPage'))
+const StatusPage = lazy(() => import('./pages/StatusPage'))
 
 export default function App() {
   return (
@@ -32,6 +35,3 @@ export default function App() {
   )
 }
 
-const ReadyPage = lazy(() => import('./pages/ReadyPage'))
-const ModelsPage = lazy(() => import('./pages/ModelsPage'))
-const StatusPage = lazy(() => import('./pages/StatusPage'))

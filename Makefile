@@ -4,9 +4,11 @@ BIN := bin/$(APP)
 COVER_PROFILE := coverage.out
 COVER_MODE := atomic
 COVER_THRESHOLD ?= 80
+WEB_PORT ?= 5173
 
 .PHONY: build run tidy clean test cover cover-html cover-check e2e-py \
-        swagger-install swagger-gen swagger-build swagger-run
+        swagger-install swagger-gen swagger-build swagger-run \
+        web-build web-preview web-dev e2e-cy-mock e2e-cy-live
 
 build:
 	@mkdir -p bin
@@ -70,3 +72,42 @@ install-golangci-lint:
 lint:
 	@command -v golangci-lint >/dev/null 2>&1 || { echo "golangci-lint not found; run 'make install-golangci-lint'" >&2; exit 1; }
 	@golangci-lint run
+
+# Web (Vite + React)
+web-build:
+	@pnpm -C web build
+
+web-preview:
+	@pnpm -C web preview --port $(WEB_PORT)
+
+web-dev:
+	@pnpm -C web dev --port $(WEB_PORT)
+
+# Cypress E2E (UI harness)
+# Mock mode: serves built web with Vite preview and runs Cypress without a live API.
+e2e-cy-mock:
+	@set -euo pipefail; \
+	pnpm -C web build; \
+	pnpm -C web preview --port $(WEB_PORT) & \
+	PREVIEW_PID=$$!; \
+	trap 'kill $$PREVIEW_PID || true' EXIT; \
+	node scripts/poll-url.js http://localhost:$(WEB_PORT) 200 60 || true; \
+	CYPRESS_BASE_URL=http://localhost:$(WEB_PORT) CYPRESS_USE_MOCKS=1 pnpm run test:e2e:run
+
+# Live mode: additionally starts the Go API with a temporary models dir.
+e2e-cy-live:
+	@set -euo pipefail; \
+	pnpm -C web build; \
+	pnpm -C web preview --port $(WEB_PORT) & \
+	PREVIEW_PID=$$!; \
+	trap 'kill $$PREVIEW_PID || true' EXIT; \
+	node scripts/poll-url.js http://localhost:$(WEB_PORT) 200 60 || true; \
+	mkdir -p models_tmp; \
+	touch models_tmp/alpha.gguf models_tmp/beta.gguf; \
+	(go run ./cmd/modeld --addr :18080 --models-dir $$(pwd)/models_tmp --default-model alpha.gguf &) ; \
+	node scripts/poll-url.js http://localhost:18080/healthz 200 60 || true; \
+	CYPRESS_BASE_URL=http://localhost:$(WEB_PORT) \
+	CYPRESS_API_HEALTH_URL=http://localhost:18080/healthz \
+	CYPRESS_API_READY_URL=http://localhost:18080/readyz \
+	CYPRESS_API_STATUS_URL=http://localhost:18080/status \
+	CYPRESS_USE_MOCKS=0 pnpm run test:e2e:run

@@ -312,6 +312,17 @@ GitHub Actions runs on pushes and pull requests:
   - Caches pip based on `tests/e2e_py/requirements.txt` and Python version.
   - Runs `pytest tests/e2e_py` and uploads JUnit XML and console logs on failure.
 
+- Cypress E2E (mock) job
+  - Installs Node + pnpm, installs dependencies, builds `web/` and serves via `pnpm -C web preview`.
+  - Sets `CYPRESS_BASE_URL=http://localhost:5173` and `CYPRESS_USE_MOCKS=1`.
+  - Waits for the preview server with `scripts/poll-url.js`, then runs `pnpm run test:e2e:run`.
+  - Uploads screenshots/videos from `e2e/artifacts/` on failure.
+
+- Cypress E2E (live API) job
+  - In addition to the above, sets up Go and starts the API server on `:18080` with a temporary models directory.
+  - Exposes `CYPRESS_API_HEALTH_URL`, `CYPRESS_API_READY_URL`, and `CYPRESS_API_STATUS_URL` for the tests.
+  - Runs the same Cypress suite headlessly and uploads artifacts on failure.
+
 ## Metrics
 
 The server exposes Prometheus metrics at `GET /metrics`.
@@ -358,7 +369,14 @@ This repo includes a minimal React-based visual test harness and a Cypress E2E s
 
 ### Structure
 
-- `web/` — Vite + React single-page app (SPA) harness
+- `web/` — Vite + React Router multi-page harness
+  - Pages:
+    - `Infer` — original streaming infer UI and controls
+    - `Health` — fetches and shows `/healthz`
+    - `Ready` — fetches and shows `/readyz`
+    - `Models` — fetches and shows `/models` (supports array or `{ models: [...] }`)
+    - `Status` — fetches and shows `/status`
+  - Top-level navigation links between pages
   - Uses environment variables (no hardcoded URLs) and exposes a set of `data-testid` elements for automation
 - `e2e/` — Cypress E2E tests (e2e mode)
   - Config: `e2e/cypress.config.ts`
@@ -396,11 +414,16 @@ Rendered test IDs in the SPA:
 
 Env file (copyable example at `.env.test.example`):
 
-- `CYPRESS_BASE_URL` — the harness URL (e.g., `http://localhost:5173` if using Vite default)
+- `CYPRESS_BASE_URL` — the harness URL (e.g., `http://localhost:5173` if using Vite preview default)
 - `CYPRESS_API_HEALTH_URL` — API health URL (e.g., `http://localhost:8080/healthz`)
 - `CYPRESS_API_READY_URL` — API ready URL (e.g., `http://localhost:8080/readyz`)
+- `CYPRESS_API_STATUS_URL` — API status URL (e.g., `http://localhost:8080/status`)
 - `CYPRESS_MAX_LATENCY_MS` — threshold for end-to-end latency (default 5000)
-- `USE_MOCKS` — when `true`, E2E skips the live health check and relies on mock streaming
+- `CYPRESS_USE_MOCKS` — when `"1"`/`true`, E2E skips live API checks and relies on mock streaming
+
+Notes:
+- Cypress automatically picks up any environment variables prefixed with `CYPRESS_` and makes them available as `Cypress.env('<NAME_WITHOUT_PREFIX>')`.
+- For local runs you may also set `USE_MOCKS` in your shell and map it inside tests, but using the `CYPRESS_` prefix is recommended for CI.
 
 Artifacts on failure are written to `e2e/artifacts/` (screenshots/videos), and the suite includes a task to save arbitrary text files for debugging.
 
@@ -420,21 +443,19 @@ Additional specs (best-effort):
 
 ### Orchestration Scripts (root `package.json`)
 
-The following scripts are provided with placeholders so you can wire them to your environment:
+The following scripts are provided and ready to use:
 
-- `dev:api` → `<GO_SERVER_START_CMD>`
-- `dev:web` → `<WEB_DEV_SERVER_CMD>`
-- `dev:all` → `<CONCURRENT_RUN_CMD dev:api dev:web>`
-- `test:e2e:open` → waits for URLs and opens Cypress
-- `test:e2e:run` → waits for URLs and runs Cypress headlessly
+- `dev:api` — `make run` (starts the Go API locally)
+- `dev:web` — `pnpm -C web dev` (starts Vite dev server)
+- `dev:all` — runs both concurrently
+- `test:e2e:open` — polls configured URLs then opens Cypress
+- `test:e2e:run` — polls configured URLs then runs Cypress headlessly
 
 Notes:
 
-- Replace the angle-bracket placeholders with your actual commands, or define shell aliases used by your tooling.
-- A small guard `scripts/poll-url.js` is used before Cypress to avoid race conditions.
-- Dependencies:
-  - Install once at repo root with pnpm workspaces: `pnpm install`
-  - You can run package scripts in the `web/` workspace via pnpm filtering, e.g. `pnpm -F web dev`
+- `scripts/poll-url.js` is used before Cypress to avoid race conditions.
+- Install once at repo root with pnpm workspaces: `pnpm install`.
+- You can run package scripts in the `web/` workspace via pnpm filtering, e.g. `pnpm -C web build`.
 
 ### Quickstart
 
