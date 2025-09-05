@@ -1,0 +1,77 @@
+name: CI (E2E Cypress UI)
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'web/**'
+      - 'e2e/**'
+      - 'scripts/**'
+      - 'cmd/testctl/**'
+      - 'internal/testctl/**'
+      - '.github/workflows/ci-e2e-cypress.yml'
+  pull_request:
+    branches: [ main, master ]
+    paths:
+      - 'web/**'
+      - 'e2e/**'
+      - 'scripts/**'
+      - 'cmd/testctl/**'
+      - 'internal/testctl/**'
+      - '.github/workflows/ci-e2e-cypress.yml'
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e-cypress:
+    name: E2E (Cypress UI)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22.x'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install headless display (xvfb)
+        run: sudo apt-get update -y && sudo apt-get install -y xvfb
+
+      - name: Build testctl
+        run: |
+          mkdir -p bin
+          go build -o bin/testctl ./cmd/testctl
+
+      - name: Install JS dependencies (via testctl)
+        run: bin/testctl install js
+
+      - name: Run Cypress (mock mode) via testctl
+        env:
+          WEB_PORT: 5173
+        run: bin/testctl test web mock
+
+      - name: Upload Cypress videos and screenshots on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypress-artifacts
+          path: |
+            e2e/artifacts/screenshots
+            e2e/artifacts/videos
