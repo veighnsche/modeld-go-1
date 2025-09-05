@@ -15,6 +15,11 @@ func (m *Manager) beginGeneration(ctx context.Context, modelID string) (func(), 
 		return func() {}, modelNotFoundError{id: modelID}
 	}
 
+	// Fast path: respect an already-canceled context
+	if err := ctx.Err(); err != nil {
+		return func() {}, err
+	}
+
 	// Try to reserve a queue slot with timeout
 	select {
 	case inst.queueCh <- struct{}{}:
@@ -32,6 +37,10 @@ func (m *Manager) beginGeneration(ctx context.Context, modelID string) (func(), 
 			<-inst.queueCh
 		}
 	}()
+	// Check for cancellation again before blocking on gen slot
+	if err := ctx.Err(); err != nil {
+		return func() {}, err
+	}
 	select {
 	case inst.genCh <- struct{}{}:
 		acquired = true

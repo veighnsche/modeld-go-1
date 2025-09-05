@@ -172,8 +172,9 @@ func TestInferStreamsAndFlushes(t *testing.T) {
 	dir := t.TempDir()
 	p := createModelFile(t, dir, "m.bin", 1)
 	reg := []types.Model{{ID: "m", Path: p}}
-	m := NewWithConfig(ManagerConfig{Registry: reg, DefaultModel: "m"})
+	m := NewWithConfig(ManagerConfig{Registry: reg, DefaultModel: "m", MaxQueueDepth: 1, MaxWait: 10 * time.Millisecond})
 
+	m.adapter = &fakeAdapter{tokens: []string{"a", "b", "c"}, final: FinalResult{FinishReason: "stop"}}
 	if err := m.EnsureInstance(context.Background(), "m"); err != nil {
 		t.Fatalf("ensure: %v", err)
 	}
@@ -185,7 +186,7 @@ func TestInferStreamsAndFlushes(t *testing.T) {
 		t.Fatalf("infer: %v", err)
 	}
 	out := buf.String()
-	// Expect 4 lines as per stub implementation
+	// Expect 4 lines (3 tokens + final)
 	lines := 0
 	for {
 		_, err := buf.ReadString('\n')

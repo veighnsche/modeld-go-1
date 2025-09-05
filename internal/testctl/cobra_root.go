@@ -95,12 +95,19 @@ func buildRootCmdWith(cfg *Config) *cobra.Command {
 	testPyHaiku := &cobra.Command{Use: "py:haiku", Short: "Run Python haiku test only", RunE: func(cmd *cobra.Command, args []string) error { return fnRunPyTestHaiku() }}
 
 	// test web (no mock support)
-	testWeb := &cobra.Command{Use: "web", Short: "Run Cypress UI tests (Cypress-only)", Example: "  testctl test web host\n  testctl test web haiku", Args: func(cmd *cobra.Command, args []string) error { return nil }, RunE: func(cmd *cobra.Command, args []string) error {
-		return fmt.Errorf("test web requires a mode: host|haiku")
+	testWeb := &cobra.Command{Use: "web", Short: "Run Cypress UI tests (Cypress-only)", Example: "  testctl test web host\n  testctl test web haiku\n  testctl test web auto", Args: func(cmd *cobra.Command, args []string) error { return nil }, RunE: func(cmd *cobra.Command, args []string) error {
+		return fmt.Errorf("test web requires a mode: host|haiku|auto")
 	}}
 	webLive := &cobra.Command{Use: "host", Short: "Run Cypress against local server using host models", RunE: func(cmd *cobra.Command, args []string) error { return fnTestWebLiveHost(cfg) }}
 	webHaiku := &cobra.Command{Use: "haiku", Short: "Run only the Haiku Cypress spec (live backend)", RunE: func(cmd *cobra.Command, args []string) error { return fnTestWebHaikuHost(cfg) }}
-	testWeb.AddCommand(webLive, webHaiku)
+	webAuto := &cobra.Command{Use: "auto", Short: "Auto-detect and run web tests (live-only)", RunE: func(cmd *cobra.Command, args []string) error {
+		if !fnHasHostModels() {
+			return fmt.Errorf("no host models found; live UI tests require models in $HOME/models/llm")
+		}
+		info("[testctl] Detected host models, running host UI suite")
+		return fnTestWebLiveHost(cfg)
+	}}
+	testWeb.AddCommand(webLive, webHaiku, webAuto)
 
 	// test all auto
 	testAll := &cobra.Command{Use: "all", Short: "Run all test suites", Args: func(cmd *cobra.Command, args []string) error { return nil }, RunE: func(cmd *cobra.Command, args []string) error {

@@ -57,7 +57,7 @@ func TestE2E_Backpressure429(t *testing.T) {
 		MarginMB:      0,
 		DefaultModel:  models[0],
 		MaxQueueDepth: 1, // one waiting request besides the in-flight
-		MaxWait:       5 * time.Millisecond,
+		MaxWait:       1 * time.Millisecond,
 	}
 	srv, _ := newServerForDirWithConfig(t, dir, cfg)
 

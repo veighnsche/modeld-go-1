@@ -20,10 +20,6 @@ type ManagerConfig struct {
 	DefaultModel  string
 	MaxQueueDepth int
 	MaxWait       time.Duration
-	// Inference / llama.cpp configuration (no envs; set by callers)
-	LlamaBin     string
-	LlamaCtx     int
-	LlamaThreads int
 	// HTTP llama server configuration
 	LlamaServerURL      string
 	LlamaAPIKey         string

@@ -1,5 +1,7 @@
 package manager
 
+import "errors"
+
 // tooBusyError signals queue timeout/overflow for 429 mapping.
 type tooBusyError struct{ modelID string }
 
@@ -7,8 +9,8 @@ func (e tooBusyError) Error() string { return "too busy: " + e.modelID }
 
 // IsTooBusy reports whether err indicates backpressure (return 429).
 func IsTooBusy(err error) bool {
-	_, ok := err.(tooBusyError)
-	return ok
+    var tb tooBusyError
+    return errors.As(err, &tb)
 }
 
 // ErrModelNotFound returns an error when a requested model id is not present in the registry.
@@ -20,8 +22,8 @@ func ErrModelNotFound(id string) error { return modelNotFoundError{id: id} }
 
 // IsModelNotFound reports whether the error indicates a missing model id.
 func IsModelNotFound(err error) bool {
-	_, ok := err.(modelNotFoundError)
-	return ok
+    var e modelNotFoundError
+    return errors.As(err, &e)
 }
 
 // dependencyUnavailableError signals a missing external dependency (e.g., llama.cpp)
@@ -35,6 +37,6 @@ func ErrDependencyUnavailable(msg string) error { return dependencyUnavailableEr
 
 // IsDependencyUnavailable reports whether err indicates a missing/failed runtime dependency.
 func IsDependencyUnavailable(err error) bool {
-	_, ok := err.(dependencyUnavailableError)
-	return ok
+    var e dependencyUnavailableError
+    return errors.As(err, &e)
 }

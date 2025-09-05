@@ -45,10 +45,7 @@ func main() {
 	corsOrigins := flag.String("cors-origins", "", "Comma-separated list of allowed CORS origins")
 	corsMethods := flag.String("cors-methods", "", "Comma-separated list of allowed CORS methods")
 	corsHeaders := flag.String("cors-headers", "", "Comma-separated list of allowed CORS request headers")
-	// Inference / llama.cpp (legacy in-process; deprecated when server URL provided)
-	llamaBin := flag.String("llama-bin", "", "Path to llama.cpp server binary (llama-server)")
-	llamaCtx := flag.Int("llama-ctx", 4096, "Context window size for llama.cpp")
-	llamaThreads := flag.Int("llama-threads", 0, "Threads for llama.cpp (0=auto)")
+	// Inference / llama.cpp server (preferred)
 	// Inference / llama.cpp server (preferred)
 	llamaURL := flag.String("llama-url", "", "Base URL for llama.cpp server, e.g., http://127.0.0.1:8081")
 	llamaAPIKey := flag.String("llama-api-key", "", "Bearer API key for llama.cpp server (optional)")
@@ -112,16 +109,6 @@ func main() {
 					*maxWait = d
 				}
 			}
-			// Inference / llama.cpp (CLI has precedence): legacy
-			if !setFlags["llama-bin"] && cfg.LlamaBin != "" {
-				*llamaBin = cfg.LlamaBin
-			}
-			if !setFlags["llama-ctx"] && cfg.LlamaCtx > 0 {
-				*llamaCtx = cfg.LlamaCtx
-			}
-			if !setFlags["llama-threads"] && cfg.LlamaThreads >= 0 {
-				*llamaThreads = cfg.LlamaThreads
-			}
 			// Inference / llama.cpp server
 			if !setFlags["llama-url"] && cfg.LlamaServerURL != "" {
 				*llamaURL = cfg.LlamaServerURL
@@ -178,9 +165,6 @@ func main() {
 		DefaultModel:  *defaultModel,
 		MaxQueueDepth: *maxQueueDepth,
 		MaxWait:       *maxWait,
-		LlamaBin:      *llamaBin,
-		LlamaCtx:      *llamaCtx,
-		LlamaThreads:  *llamaThreads,
 		// Server adapter config
 		LlamaServerURL:      *llamaURL,
 		LlamaAPIKey:         *llamaAPIKey,

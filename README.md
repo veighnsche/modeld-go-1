@@ -23,66 +23,43 @@ A lightweight control-plane service (Go 1.23+) to manage multiple preloaded llam
 - Build & Run the API: see [docs/build-and-run.md](docs/build-and-run.md)
 - API reference (Swagger): see [docs/api.md](docs/api.md)
 
-## Build mode and llama.cpp runtime
+## Runtime and llama.cpp server
 
-The default build is llama‑enabled (CGO) and produces a binary capable of local inference via `go-llama.cpp`.
+The service uses an external `llama-server` process via HTTP (OpenAI-compatible endpoints). No CGO is required.
 
-- In‑process llama (default):
-  - Makefile `build` target compiles with `CGO_ENABLED=1 -tags=llama`.
-  - Uses `github.com/go-skynet/go-llama.cpp` to run models in‑process.
-  - Files: `internal/manager/adapter_llama.go`, `internal/manager/llama_cgo.go`.
-
-- Stub (opt-in, no CGO):
-  - Only when you intentionally build without the `llama` tag (not the default).
-  - Files: `internal/manager/adapter_llama_stub.go`.
-  - The server preflight will hard-fail with a clear message if run without llama support.
-
-Notes
-
-- External `llama_server` process mode has been removed. All inference goes through the in‑process go‑llama.cpp adapter.
-- `llama_cgo.go` sets an rpath of `$ORIGIN` so the loader can find `libllama.so` next to your built binary, if you place it there.
-
-### In‑process llama configuration
-
-Provide a config that enables inference and sets llama parameters (example snippet):
-
-```go
-mgr := manager.NewWithConfig(manager.ManagerConfig{
-    Registry: []types.Model{{ID: "tinyllama-q4", Path: "/path/to/model.gguf"}},
-    DefaultModel:     "tinyllama-q4",
-    LlamaCtx:         4096,
-    LlamaThreads:     8,
-})
-```
-
-Ensure the native llama library is discoverable at runtime. Options:
-
-- Place `libllama.so` next to the built binary (benefits from `$ORIGIN` rpath set by `llama_cgo.go`).
-- Or install it in a system path that the dynamic loader uses.
-
-### Llama library location (LLAMA_BIN_DIR)
-
-The Makefile copies the required shared libraries from `LLAMA_BIN_DIR` into `./bin` before building, so the loader finds them via `$ORIGIN`.
-
-- Default expected path (under your home directory):
-
-  - `$HOME/apps/llama.cpp/build/bin`
-
-- Alternate known path:
-
-  - `$HOME/src/llama.cpp/build-cuda14/bin`
-
-Override when needed:
+- Build:
+  - `make build` produces a static Go binary (CGO disabled).
+- Run llama.cpp server separately, for example:
 
 ```bash
-make llama-libs LLAMA_BIN_DIR=/absolute/path/to/llama.cpp/build/bin
-make build
+llama-server \
+  -m /path/to/model.gguf \
+  -c 4096 -t 4 -ngl 0 \
+  --host 127.0.0.1 --port 8081
 ```
 
-After copying, the following files should exist next to the binary in `./bin/`:
+- Run modeld and point it at the server:
 
-- `libllama.so`
-- `libggml*.so`
+```bash
+./bin/modeld \
+  --addr :8080 \
+  --models-dir "$HOME/models/llm" \
+  --default-model tinyllama-q4 \
+  --llama-url http://127.0.0.1:8081 \
+  --llama-timeout 30s \
+  --llama-connect-timeout 5s \
+  --llama-use-openai
+```
+
+Relevant flags (also supported in config files):
+
+- `--llama-url` (string): Base URL of `llama-server`.
+- `--llama-api-key` (string): Optional bearer token.
+- `--llama-timeout` (duration): Request timeout (default 30s).
+- `--llama-connect-timeout` (duration): Dial timeout (default 5s).
+- `--llama-use-openai` (bool): Prefer OpenAI-compatible endpoints (default true).
+
+See `docs/env-examples/llama-server.env.example` for a quick-start environment sample.
 
 ## API Cheat Sheet
 
@@ -227,17 +204,14 @@ Design goals:
 
 ## FAQ
 
-- __How do I enable in‑process llama?__
-  Build with `-tags=llama`. Configure `LlamaCtx` and `LlamaThreads` as needed in `manager.ManagerConfig`.
+- __How do I run inference?__
+  Start `llama-server` with your `.gguf` model, then run `modeld` with `--llama-url` pointing at it. See the run examples above.
 
-- __I get "cannot find -lllama" or runtime loader errors about `libllama.so`. What do I do?__
-  Ensure the native llama library is available to the dynamic loader. Easiest is to place `libllama.so` next to your built binary; `internal/manager/llama_cgo.go` sets rpath `$ORIGIN` so the loader finds it there. Alternatively, install it in a system library path.
+- __Do I need CGO or `libllama.so`?__
+  No. The in-process adapter was removed. All inference goes through the external `llama-server` over HTTP.
 
-- __Do I need an external `llama_server` process?__
-  No. External server mode was removed. All inference is handled in‑process via `go-skynet/go-llama.cpp`.
-
-- __Builds succeed but inference returns a dependency error.__
-  Make sure you built with `-tags=llama`. Without the tag, the stub adapter is used (no CGO) and inference is unavailable.
+- __Builds succeed but `/infer` returns a dependency error.__
+  Ensure `--llama-url` (or `llama_url` in config) is set and the server is reachable. The preflight will fail clearly if not.
 
 - __How do I configure the default model?__
   Provide your registry via `manager.ManagerConfig.Registry` and set `DefaultModel` to the desired model ID. The `Path` field must point to a valid `.gguf` file.
@@ -248,8 +222,8 @@ Design goals:
 - __How is VRAM usage enforced?__
   The manager estimates model size from the file size (MB) and evicts least‑recently‑used idle instances when `BudgetMB` would be exceeded (plus `MarginMB`). See `internal/manager/instance_evict.go`.
 
-- __Can I run tests without CGO?__
-  Yes. By default (without `-tags=llama`) the stub adapter builds and all manager tests run with no native dependencies.
+- __Can I run tests locally?__
+  Yes. E2E tests run against a mock `llama-server`. Unit tests include an SSE streaming path for the adapter.
 
 ## License
 

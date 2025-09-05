@@ -2,6 +2,20 @@
 
 This document outlines the end-to-end plan to replace the in-process `go-llama.cpp` integration with an HTTP client that talks to the llama.cpp API server (`llama-server`). It is designed for incremental, low-risk rollout with clear configuration, testing, and deprecation steps.
 
+## Progress
+
+- [x] HTTP adapter implemented: `internal/manager/adapter_llama_server.go` (OpenAI SSE streaming)
+- [x] Config and CLI added (server URL, API key, timeouts, use-openai)
+- [x] Manager wiring to use server adapter when `llama_url` is set
+- [x] Makefile simplified (CGO removed); legacy in-process adapter fully removed
+- [x] Preflight: server reachability and model validation
+- [x] E2E tests adapted to llama-server mock; all tests green
+- [x] Unit test for adapter SSE streaming
+- [ ] Additional adapter unit tests (errors, cancellation)
+- [x] Env example added for llama-server
+- [ ] README/docs updated for llama-server run instructions and flags
+
+Latest Status: All tests pass (unit + E2E). Server adapter is default when `--llama-url` is set; CGO/in-process adapter is removed.
 
 ## Goals
 
@@ -209,28 +223,29 @@ Augment `Manager.Preflight()` to include server mode checks when `LlamaServerURL
 ## Work Items Checklist
 
 - Adapter design and implementation
-  - [ ] `internal/manager/adapter_llama_server.go`
-  - [ ] HTTP client with timeouts and SSE/native parsing
-  - [ ] Usage and finish_reason mapping
+  - [x] `internal/manager/adapter_llama_server.go`
+  - [x] HTTP client with timeouts and SSE/native parsing
+  - [x] Usage and finish_reason mapping (basic)
 
 - Config and wiring
-  - [ ] Add fields to `ManagerConfig` and `Manager`
-  - [ ] Update `NewWithConfig` factory logic
-  - [ ] CLI flags in `cmd/modeld/main.go`
-  - [ ] Optional config file integration
+  - [x] Add fields to `ManagerConfig` (server URL, API key, timeouts, use-openai)
+  - [x] Update `NewWithConfig` factory logic
+  - [x] CLI flags in `cmd/modeld/main.go`
+  - [x] Optional config file integration (`internal/config/loader.go`)
 
 - Preflight and sanity
-  - [ ] Reachability and models check
-  - [ ] Clear error messages in preflight summary
+  - [x] Reachability and models check
+  - [x] Clear error messages in preflight summary
 
 - Tests
-  - [ ] Unit tests for adapter (SSE, native, errors, cancel)
-  - [ ] E2E setup targeting `llama-server`
+  - [x] Unit tests for adapter (SSE basic)
+  - [ ] Unit tests for adapter (errors, cancel)
+  - [x] E2E setup targeting `llama-server` (mocked)
 
 - Docs and cleanup
-  - [ ] Update README and docs
-  - [ ] Add env example
-  - [ ] Deprecate CGO and plan removal
+  - [ ] Update README and docs (server run instructions, flags)
+  - [x] Add env example
+  - [x] Deprecate CGO and remove in-process adapter & build tag
 
 
 ## Open Questions / Assumptions
