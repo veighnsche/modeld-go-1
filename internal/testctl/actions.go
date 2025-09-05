@@ -14,6 +14,7 @@ var (
 
 	fnTestWebMock     = testWebMock
 	fnTestWebLiveHost = testWebLiveHost
+	fnTestWebHaikuHost = testWebHaikuHost
 
 	fnHasHostModels = hasHostModels
 

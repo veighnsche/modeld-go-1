@@ -19,7 +19,7 @@ func usage() {
 	fmt.Println("  install all|js|go|py|host:docker|host:act|host:all")
 	fmt.Println("  test go")
 	fmt.Println("  test api:py")
-	fmt.Println("  test web mock|live:host|auto")
+	fmt.Println("  test web mock|live:host|auto|haiku")
 	fmt.Println("  test all auto")
 	fmt.Println("  test ci all [runner:catthehacker|runner:default]")
 	fmt.Println("  test ci one <workflow.yml|yaml> [runner:catthehacker|runner:default]")
@@ -77,13 +77,16 @@ func Run(args []string, cfg *Config) error {
 			return fnRunPyTests()
 		case "web":
 			if len(args) < 3 {
-				return fmt.Errorf("test web requires a mode: mock|live:host|auto")
+				return fmt.Errorf("test web requires a mode: mock|live:host|auto|haiku")
 			}
 			switch args[2] {
 			case "mock":
 				return fnTestWebMock(cfg)
 			case "live:host":
 				return fnTestWebLiveHost(cfg)
+			case "haiku":
+				// DO NOT MOCK THE HAIKU FOR TESTING!!!
+				return fnTestWebHaikuHost(cfg)
 			case "auto":
 				if fnHasHostModels() {
 					info("[testctl] Detected host models, running live:host UI suite")
