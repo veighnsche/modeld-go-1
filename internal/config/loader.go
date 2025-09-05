@@ -32,9 +32,9 @@ type Config struct {
 	MaxQueueDepth int    `json:"max_queue_depth" yaml:"max_queue_depth" toml:"max_queue_depth"`
 	MaxWait       string `json:"max_wait" yaml:"max_wait" toml:"max_wait"`
 	// Inference (in-process via llama.cpp)
-	LlamaBin         string `json:"llama_bin" yaml:"llama_bin" toml:"llama_bin"`
-	LlamaCtx         int    `json:"llama_ctx" yaml:"llama_ctx" toml:"llama_ctx"`
-	LlamaThreads     int    `json:"llama_threads" yaml:"llama_threads" toml:"llama_threads"`
+	LlamaBin     string `json:"llama_bin" yaml:"llama_bin" toml:"llama_bin"`
+	LlamaCtx     int    `json:"llama_ctx" yaml:"llama_ctx" toml:"llama_ctx"`
+	LlamaThreads int    `json:"llama_threads" yaml:"llama_threads" toml:"llama_threads"`
 }
 
 // Load reads a configuration file based on its extension.

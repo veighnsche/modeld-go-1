@@ -6,9 +6,9 @@ import (
 
 // SanityReport describes runtime checks for external dependencies.
 type SanityReport struct {
-	LlamaFound       bool   `json:"llama_found"`
-	LlamaPath        string `json:"llama_path,omitempty"`
-	Error            string `json:"error,omitempty"`
+	LlamaFound bool   `json:"llama_found"`
+	LlamaPath  string `json:"llama_path,omitempty"`
+	Error      string `json:"error,omitempty"`
 }
 
 // SanityCheck validates that required dependencies are available for inference.

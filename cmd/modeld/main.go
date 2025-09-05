@@ -139,15 +139,15 @@ func main() {
 	}
 	// Use ManagerConfig to pass backpressure knobs
 	mgr := manager.NewWithConfig(manager.ManagerConfig{
-		Registry:         reg,
-		BudgetMB:         *vramBudgetMB,
-		MarginMB:         *vramMarginMB,
-		DefaultModel:     *defaultModel,
-		MaxQueueDepth:    *maxQueueDepth,
-		MaxWait:          *maxWait,
-		LlamaBin:         *llamaBin,
-		LlamaCtx:         *llamaCtx,
-		LlamaThreads:     *llamaThreads,
+		Registry:      reg,
+		BudgetMB:      *vramBudgetMB,
+		MarginMB:      *vramMarginMB,
+		DefaultModel:  *defaultModel,
+		MaxQueueDepth: *maxQueueDepth,
+		MaxWait:       *maxWait,
+		LlamaBin:      *llamaBin,
+		LlamaCtx:      *llamaCtx,
+		LlamaThreads:  *llamaThreads,
 	})
 
 	// Preflight: validate adapter presence and default model path.

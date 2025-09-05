@@ -21,9 +21,9 @@ type ManagerConfig struct {
 	MaxQueueDepth int
 	MaxWait       time.Duration
 	// Inference / llama.cpp configuration (no envs; set by callers)
-	LlamaBin         string
-	LlamaCtx         int
-	LlamaThreads     int
+	LlamaBin     string
+	LlamaCtx     int
+	LlamaThreads int
 }
 
 // NewWithConfig constructs a Manager from ManagerConfig.

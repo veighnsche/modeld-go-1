@@ -36,9 +36,9 @@ type Manager struct {
 	adapter InferenceAdapter
 
 	// Inference / llama.cpp configuration (flag-driven, no envs)
-	LlamaBin         string
-	LlamaCtx         int
-	LlamaThreads     int
+	LlamaBin     string
+	LlamaCtx     int
+	LlamaThreads int
 }
 
 func New(reg []types.Model, budgetMB, marginMB int, defaultModel string) *Manager {
