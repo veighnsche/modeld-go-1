@@ -17,6 +17,11 @@ export default function InferPage() {
     let didCancel = false
     ;(async () => {
       try {
+        if (USE_MOCKS) {
+          // In mock mode, surface a stable models count for the UI/tests.
+          if (!didCancel) setModelsCount(1)
+          return
+        }
         const res = await fetch(fullUrl(PATHS.models))
         if (!res.ok) throw new Error(`models ${res.status}`)
         const data = await res.json()

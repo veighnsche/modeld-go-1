@@ -4,6 +4,8 @@ bin/
 *.test
 *.out
 coverage.txt
+coverage.out
+coverage.html
 
 # Editors
 .vscode/
@@ -33,13 +35,21 @@ web/.vite/
 
 # Cypress artifacts
 e2e/artifacts/
+e2e/e2e/artifacts/
 e2e/screenshots/
 e2e/videos/
 e2e/downloads/
 cypress/
 
+# Temp directories
+models_tmp/
+Makefile.tmp
+
 # Local env files
+/.env
+/.env.*
 .env.test
+!/.env.test.example
 web/.env.local
 web/.env.*
 !web/.env

@@ -91,8 +91,8 @@ web-dev:
 # Mock mode: serves built web with Vite preview and runs Cypress without a live API.
 e2e-cy-mock:
 	@set -euo pipefail; \
-	pnpm -C web build; \
-	pnpm -C web preview --port $(WEB_PORT) & \
+	VITE_USE_MOCKS=1 pnpm -C web build; \
+	VITE_USE_MOCKS=1 pnpm -C web preview --port $(WEB_PORT) & \
 	PREVIEW_PID=$$!; \
 	trap 'kill $$PREVIEW_PID || true' EXIT; \
 	node scripts/cli/poll-url.js http://localhost:$(WEB_PORT) 200 60 || true; \
