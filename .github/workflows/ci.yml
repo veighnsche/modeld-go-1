@@ -44,6 +44,9 @@ jobs:
       - name: Download dependencies
         run: go mod download
 
+      - name: CLI self-tests
+        run: make test-cli
+
       - name: Verify module files tidy
         run: |
           set -euo pipefail

@@ -9,7 +9,7 @@ WEB_PORT ?= 5173
 .PHONY: build run tidy clean test cover cover-html cover-check e2e-py \
         swagger-install swagger-gen swagger-build swagger-run \
         web-build web-preview web-dev e2e-cy-mock e2e-cy-live \
-        test-all
+        test-all cli test-cli
 
 build:
 	@mkdir -p bin
@@ -115,3 +115,11 @@ e2e-cy-live:
 	CYPRESS_API_READY_URL=http://localhost:18080/readyz \
 	CYPRESS_API_STATUS_URL=http://localhost:18080/status \
 	CYPRESS_USE_MOCKS=0 pnpm run test:e2e:run
+
+# Convenience: launch the Bash CLI helper
+cli:
+	@bash scripts/cli/test.sh
+
+# Run CLI tests
+test-cli:
+	@bash scripts/tests/cli.test.sh

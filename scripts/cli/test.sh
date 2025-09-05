@@ -3,6 +3,15 @@ set -euo pipefail
 
 VERSION="0.1.0"
 
+# If TEST_CLI_DRYRUN=1, we will print commands instead of executing them.
+run_cmd() {
+  if [[ "${TEST_CLI_DRYRUN:-0}" = "1" ]]; then
+    echo "DRYRUN:" "$@"
+  else
+    "$@"
+  fi
+}
+
 usage() {
   cat <<'USAGE'
 Usage: test-cli <command>
@@ -88,31 +97,31 @@ shift || true
 
 case "$cmd" in
   install:all)
-    bash scripts/install/all.sh "$@"
+    run_cmd bash scripts/install/all.sh "$@"
     ;;
   install:js)
-    bash scripts/install/js.sh "$@"
+    run_cmd bash scripts/install/js.sh "$@"
     ;;
   install:go)
-    bash scripts/install/go.sh "$@"
+    run_cmd bash scripts/install/go.sh "$@"
     ;;
   install:py)
-    bash scripts/install/py.sh "$@"
+    run_cmd bash scripts/install/py.sh "$@"
     ;;
   test:go)
-    bash scripts/tests/go.sh "$@"
+    run_cmd bash scripts/tests/go.sh "$@"
     ;;
   test:py)
-    make e2e-py "$@"
+    run_cmd make e2e-py "$@"
     ;;
   test:cy:mock)
-    make e2e-cy-mock "$@"
+    run_cmd make e2e-cy-mock "$@"
     ;;
   test:cy:live)
-    make e2e-cy-live "$@"
+    run_cmd make e2e-cy-live "$@"
     ;;
   test:all)
-    bash scripts/tests/all.sh "$@"
+    run_cmd bash scripts/tests/all.sh "$@"
     ;;
   --version)
     echo "test-cli version $VERSION"

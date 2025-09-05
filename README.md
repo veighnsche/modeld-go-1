@@ -488,6 +488,11 @@ Notes:
 - The CLI attempts to enable pnpm via corepack if available.
 - Cypress runs rely on environment variables, e.g. `CYPRESS_BASE_URL`, `CYPRESS_USE_MOCKS`, and `CYPRESS_API_*`.
 
+Shortcuts:
+
+- `pnpm run cli` — launches the interactive CLI (`scripts/cli/test.sh`).
+- `make cli` — same as above via Makefile.
+
 ### Quickstart
 
 1. Install deps (pnpm workspaces):
