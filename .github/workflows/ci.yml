@@ -102,6 +102,12 @@ jobs:
           set -euo pipefail
           go build ./...
 
+      - name: Build testctl (thin CLI)
+        run: |
+          set -euo pipefail
+          mkdir -p bin
+          go build -o bin/testctl ./cmd/testctl
+
       - name: Compile (swagger build tag)
         run: |
           set -euo pipefail

@@ -229,7 +229,7 @@ Endpoints:
 
 - `GET /healthz`
   - Liveness. Always `200 ok` if process is up.
-
+    return ParseConfigWith(flag.CommandLine, os.Args[1:])
 - `GET /readyz`
   - Readiness. `200 ready` when at least one instance is ready (or default route is ready); otherwise `503 loading`.
 
@@ -491,6 +491,28 @@ Shortcuts:
 
 - `pnpm run cli` — runs `bin/testctl`.
 - `make test-all` — installs via testctl and runs the full suite with `test all auto`.
+
+#### Implementation structure (testctl)
+
+The CLI is implemented as a thin entrypoint with reusable internal logic:
+
+- `cmd/testctl/main.go` — minimal `main` that delegates to `internal/testctl.Main()`.
+- `internal/testctl/` — all CLI logic lives here and is unit-testable:
+  - `Run(args []string, cfg *Config) error` — dispatches subcommands.
+  - `ParseConfigWith(fs *flag.FlagSet, args []string) (*Config, []string)` — parses flags/env with an injectable `FlagSet` for tests.
+  - `ParseConfig()` — small wrapper over `ParseConfigWith` using `flag.CommandLine` and `os.Args[1:]`.
+  - `MainWithArgs(args []string) int` — testable entrypoint that returns an exit code.
+  - `Main() int` — production entrypoint used by `cmd/testctl`.
+
+Legacy sources under `cmd/testctl/` are preserved for reference but excluded from builds via `//go:build ignore` to prevent conflicts. All new work should target `internal/testctl/`.
+
+Testing the CLI logic (unit):
+
+```bash
+go test ./internal/testctl -v
+```
+
+These tests stub indirect function variables (e.g., installers, runners) and verify dispatch/flag parsing without spawning subprocesses.
 
 ### Quickstart
 

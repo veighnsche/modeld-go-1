@@ -1,4 +1,4 @@
-package main
+package testctl
 
 // killProcesses is a best-effort cleanup hook invoked by web test flows.
 // At present, individual processes (server/preview) are started with contexts
