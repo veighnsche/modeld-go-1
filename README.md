@@ -349,3 +349,107 @@ See `LICENSE` for the full text. When adding new source files, you can include a
 ```text
 // SPDX-License-Identifier: GPL-3.0-only
 ```
+
+---
+
+## Visual Harness + Cypress E2E (Testing Add-on)
+
+This repo includes a minimal React-based visual test harness and a Cypress E2E suite to validate end-to-end behavior of the HTTP API (UI → API → stream → UI). This harness is strictly for testing and is not a production UI.
+
+### Structure
+
+- `web/` — Vite + React single-page app (SPA) harness
+  - Uses environment variables (no hardcoded URLs) and exposes a set of `data-testid` elements for automation
+- `e2e/` — Cypress E2E tests (e2e mode)
+  - Config: `e2e/cypress.config.ts`
+  - Specs: `e2e/specs/*.cy.ts`
+  - Support: `e2e/support/`
+- `scripts/poll-url.js` — small Node helper to poll a URL until it returns an expected status
+- `package.json` (root) — orchestration scripts (with placeholders to adapt to your environment)
+
+### Web Harness
+
+Environment variables (via `web/.env` or your shell):
+
+- `VITE_API_BASE_URL` (e.g. `http://localhost:8080`)
+- `VITE_HEALTH_PATH` (default `/healthz`)
+- `VITE_READY_PATH` (default `/readyz`)
+- `VITE_MODELS_PATH` (default `/models`)
+- `VITE_STATUS_PATH` (default `/status`)
+- `VITE_INFER_PATH` (default `/infer`)
+- `VITE_SEND_STREAM_FIELD` (default `false`) — include `{ "stream": true }` in POST if your server requires it
+- `VITE_USE_MOCKS` (`true|false`, default `false`) — mock mode bypasses network and emits a deterministic NDJSON sequence
+
+Rendered test IDs in the SPA:
+
+- `data-testid="mode"` — `mock|live`
+- `data-testid="models-count"` — optional models count (calls `/models` on load)
+- `data-testid="prompt-input"` — textarea for prompt
+- `data-testid="model-input"` — optional model id (blank to use default)
+- `data-testid="submit-btn"` — send request
+- `data-testid="status"` — `idle|requesting|success|error`
+- `data-testid="stream-log"` — NDJSON lines appended as they arrive
+- `data-testid="result-json"` — full last response (best-effort) as JSON string
+- `data-testid="latency-ms"` — measured end-to-end duration in milliseconds
+
+### Cypress E2E
+
+Env file (copyable example at `.env.test.example`):
+
+- `CYPRESS_BASE_URL` — the harness URL (e.g., `http://localhost:5173` if using Vite default)
+- `CYPRESS_API_HEALTH_URL` — API health URL (e.g., `http://localhost:8080/healthz`)
+- `CYPRESS_API_READY_URL` — API ready URL (e.g., `http://localhost:8080/readyz`)
+- `CYPRESS_MAX_LATENCY_MS` — threshold for end-to-end latency (default 5000)
+- `USE_MOCKS` — when `true`, E2E skips the live health check and relies on mock streaming
+
+Artifacts on failure are written to `e2e/artifacts/` (screenshots/videos), and the suite includes a task to save arbitrary text files for debugging.
+
+Core spec: `e2e/specs/visual_infer.cy.ts`
+
+- Visits `/`, optionally waits for API `healthz` (live mode)
+- Types a prompt, optionally sets a model, clicks send
+- Asserts status transitions to `requesting` then `success`
+- Asserts `stream-log` contains ≥ 2 lines and final line indicates completion (contains `"done": true`)
+- Ensures `result-json` is non-empty and parseable JSON, no console errors, and latency under threshold
+
+Additional specs (best-effort):
+
+- `ready_flow.cy.ts` — verifies `readyz` transitions after first infer (skipped in mock mode)
+- `models_list.cy.ts` — verifies `/models` count renders if available
+- `errors.cy.ts` — invalid model name surfaces error (expects UI `status=error` and error text)
+
+### Orchestration Scripts (root `package.json`)
+
+The following scripts are provided with placeholders so you can wire them to your environment:
+
+- `dev:api` → `<GO_SERVER_START_CMD>`
+- `dev:web` → `<WEB_DEV_SERVER_CMD>`
+- `dev:all` → `<CONCURRENT_RUN_CMD dev:api dev:web>`
+- `test:e2e:open` → waits for URLs and opens Cypress
+- `test:e2e:run` → waits for URLs and runs Cypress headlessly
+
+Notes:
+
+- Replace the angle-bracket placeholders with your actual commands, or define shell aliases used by your tooling.
+- A small guard `scripts/poll-url.js` is used before Cypress to avoid race conditions.
+- Dependencies:
+  - Install once at repo root with pnpm workspaces: `pnpm install`
+  - You can run package scripts in the `web/` workspace via pnpm filtering, e.g. `pnpm -F web dev`
+
+### Quickstart
+
+1. Install deps (pnpm workspaces):
+   - `pnpm install`
+2. Configure envs:
+   - Copy `.env.test.example` → `.env.test` and edit as needed
+   - Edit `web/.env` (or use `web/.env.mock` for mock mode)
+3. Run everything:
+   - `pnpm run dev:all` (fills in your placeholders)
+   - Visit the harness at `CYPRESS_BASE_URL`
+4. Run tests (load env first):
+   - Bash/Zsh: `set -a; source .env.test; set +a`
+   - Then run:
+     - Headless: `pnpm run test:e2e:run`
+     - Interactive: `pnpm run test:e2e:open`
+
+All URLs/ports/paths are env-driven; there are no hardcoded values in the harness or tests.

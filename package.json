@@ -1,0 +1,33 @@
+{
+  "name": "modeld-go-addon-e2e",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@9.7.1",
+  "scripts": {
+    "dev:api": "make run",
+    "dev:web": "pnpm -C web dev",
+    "dev:all": "pnpm dlx concurrently -k -n api,web -c blue,green \"pnpm run dev:api\" \"pnpm -C web dev\"",
+    "test:e2e:open": "node scripts/poll-url.js $CYPRESS_API_HEALTH_URL 200 60 || true && node scripts/poll-url.js $CYPRESS_BASE_URL 200 60 || true && pnpm exec cypress open --config-file e2e/cypress.config.ts",
+    "test:e2e:run": "node scripts/poll-url.js $CYPRESS_API_HEALTH_URL 200 60 || true && node scripts/poll-url.js $CYPRESS_BASE_URL 200 60 || true && pnpm exec cypress run --config-file e2e/cypress.config.ts",
+    "stop:all": "echo 'Implement stopping processes by PID/port if desired'",
+    "lint": "pnpm exec eslint . --ext .ts,.tsx,.js,.cjs --max-warnings=0",
+    "lint:fix": "pnpm exec eslint . --ext .ts,.tsx,.js,.cjs --fix",
+    "format": "pnpm exec prettier . --write",
+    "format:check": "pnpm exec prettier . --check"
+  },
+  "devDependencies": {
+    "cypress": "^13.9.0",
+    "dotenv": "^16.4.5",
+    "@types/node": "^22.5.4",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-cypress": "^2.15.2",
+    "eslint-plugin-prettier": "^5.2.1",
+    "eslint-plugin-react": "^7.34.3",
+    "eslint-plugin-react-hooks": "^4.6.2",
+    "prettier": "^3.3.3",
+    "typescript": "^5.6.3"
+  }
+}

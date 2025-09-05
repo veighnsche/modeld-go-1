@@ -1,0 +1,7 @@
+node_modules/
+web/dist/
+e2e/artifacts/
+e2e/screenshots/
+e2e/videos/
+e2e/downloads/
+web/.vite/

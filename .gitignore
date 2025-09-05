@@ -20,3 +20,27 @@ venv/
 # pycache
 __pycache__
 .pytest_cache
+
+# Node / pnpm
+node_modules/
+.pnpm-store/
+npm-debug.log*
+pnpm-debug.log*
+
+# Vite / React build output
+web/dist/
+web/.vite/
+
+# Cypress artifacts
+e2e/artifacts/
+e2e/screenshots/
+e2e/videos/
+e2e/downloads/
+cypress/
+
+# Local env files
+.env.test
+web/.env.local
+web/.env.*
+!web/.env
+!web/.env.mock
