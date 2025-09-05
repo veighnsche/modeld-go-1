@@ -9,6 +9,7 @@ const (
 	StateReady   State = "ready"
 	StateLoading State = "loading"
 	StateError   State = "error"
+	StateDraining State = "draining"
 )
 
 // ModelInfo is a minimal view of the current model.
@@ -40,6 +41,4 @@ type Instance struct {
 	Port int
 	// Process ID when using subprocess-managed runtime
 	PID  int
-	// Process handle for managed runtime (e.g., llama-server)
-	Proc interface{}
 }

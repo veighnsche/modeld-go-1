@@ -26,7 +26,7 @@ func (m *Manager) evictUntilFits(requiredMB int) error {
 		if lru == nil {
 			// nothing to evict; still does not fit -> fail fast
 			m.mu.Unlock()
-			return ErrDependencyUnavailable("vram budget exceeded: cannot fit required model instance")
+			return ErrBudgetExceeded("vram budget exceeded: cannot fit required model instance")
 		}
 		// Evict it: if using subprocess adapter, stop the spawned llama-server.
 		if sa, ok := m.adapter.(*llamaSubprocessAdapter); ok {

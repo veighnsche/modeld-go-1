@@ -213,6 +213,11 @@ func postInfer(svc Service) http.HandlerFunc {
 				logInferEnd(lvl, start, r, "503", err)
 				return
 			}
+			if manager.IsBudgetExceeded(err) {
+				writeJSONError(w, http.StatusInsufficientStorage, err.Error())
+				logInferEnd(lvl, start, r, "507", err)
+				return
+			}
 			if manager.IsTooBusy(err) {
 				writeJSONError(w, http.StatusTooManyRequests, err.Error())
 				IncrementBackpressure("queue")

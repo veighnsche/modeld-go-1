@@ -23,10 +23,12 @@ type Manager struct {
 	// Operation sequencing (for async ops)
 	opSeq uint64
 	// Subscribers (event listeners) could be added here in the future
+	publisher EventPublisher
 
 	// Queue config
 	maxQueueDepth int
 	maxWait       time.Duration
+	drainTimeout  time.Duration
 
 	// Observability
 	startTime time.Time
@@ -34,6 +36,17 @@ type Manager struct {
 	// Optional inference adapter (e.g., llama.cpp). When set and enabled,
 	// Manager.Infer will delegate token generation to this adapter.
 	adapter InferenceAdapter
+
+	// LRU metadata persistence (optional)
+	lruPath string
+	lruMeta map[string]lruRecord
+}
+
+// Close releases background resources. For now it stops all managed
+// subprocess instances (spawn mode). Safe to call multiple times.
+func (m *Manager) Close() error {
+    m.StopAllInstances()
+    return nil
 }
 
 // StopAllInstances stops all managed runtime subprocesses (spawn mode).
@@ -57,6 +70,20 @@ func New(reg []types.Model, budgetMB, marginMB int, defaultModel string) *Manage
 		MaxQueueDepth: 0, // use package defaults
 		MaxWait:       0, // use package defaults
 	})
+}
+
+// SetEventPublisher installs an EventPublisher. Passing nil resets to no-op.
+func (m *Manager) SetEventPublisher(p EventPublisher) {
+    m.mu.Lock()
+    defer m.mu.Unlock()
+    if p == nil {
+        m.publisher = noopPublisher{}
+    } else {
+        m.publisher = p
+    }
+    if sa, ok := m.adapter.(*llamaSubprocessAdapter); ok {
+        sa.setPublisher(m.publisher)
+    }
 }
 
 // SetInferenceAdapter sets the inference adapter for the manager.

@@ -40,3 +40,20 @@ func IsDependencyUnavailable(err error) bool {
     var e dependencyUnavailableError
     return errors.As(err, &e)
 }
+
+// budgetExceededError signals capacity constraints (e.g., VRAM budget) where the
+// requested instance cannot be accommodated without evicting in-flight instances.
+// HTTP layer may map this to 507 Insufficient Storage or 429 Too Many Requests
+// depending on policy.
+type budgetExceededError struct{ msg string }
+
+func (e budgetExceededError) Error() string { return e.msg }
+
+// ErrBudgetExceeded constructs a budgetExceededError.
+func ErrBudgetExceeded(msg string) error { return budgetExceededError{msg: msg} }
+
+// IsBudgetExceeded reports whether err indicates a capacity constraint.
+func IsBudgetExceeded(err error) bool {
+    var e budgetExceededError
+    return errors.As(err, &e)
+}

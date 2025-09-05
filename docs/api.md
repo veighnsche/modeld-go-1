@@ -53,6 +53,28 @@ The server exposes a simple JSON over HTTP API. Default base URL is `http://loca
   - If `model` is omitted, the server uses the configured default model.
   - Response streams NDJSON lines; each line is a JSON object.
 
+### NDJSON Streaming Schema
+
+Adapters normalize their streaming outputs to a unified NDJSON contract for the HTTP layer:
+
+- Token lines (zero or more):
+  ```json
+  { "token": "partial text" }
+  ```
+- Final line (exactly one):
+  ```json
+  {
+    "done": true,
+    "content": "full concatenated content (if adapter didn't supply a final content, this is built from tokens)",
+    "finish_reason": "stop|length|...",
+    "usage": { "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0 }
+  }
+  ```
+
+Notes:
+- The `usage` object is adapter-reported when available; if unknown, it may be omitted or zeroed.
+- This unified NDJSON schema remains stable across runtime adapters.
+
 ## Types reference
 
 See `pkg/types/api.go` for DTOs:

@@ -2,10 +2,12 @@ package manager
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"strings"
@@ -14,7 +16,7 @@ import (
 
 // llamaServerAdapter implements InferenceAdapter by talking to a running llama.cpp server over HTTP.
 // It prefers OpenAI-compatible endpoints and falls back to native endpoints when necessary.
- type llamaServerAdapter struct {
+type llamaServerAdapter struct {
 	baseURL          string
 	apiKey           string
 	useOpenAI        bool
@@ -37,7 +39,10 @@ func NewLlamaServerAdapter(baseURL, apiKey string, useOpenAI bool, reqTimeout, c
 		TLSHandshakeTimeout: 10 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
 	}
-	cli := &http.Client{Transport: tr, Timeout: 0} // no per-request timeout here; use context/reqTimeout
+	// Intentionally set Timeout=0 here: all requests must carry context-based timeouts.
+    // See Generate() which applies reqTimeout via context, and individual calls use
+    // http.NewRequestWithContext to enforce deadlines.
+    cli := &http.Client{Transport: tr, Timeout: 0}
 	return &llamaServerAdapter{
 		baseURL:        strings.TrimRight(baseURL, "/"),
 		apiKey:         apiKey,
@@ -49,7 +54,7 @@ func NewLlamaServerAdapter(baseURL, apiKey string, useOpenAI bool, reqTimeout, c
 }
 
 // llamaServerSession holds per-session state (mostly the base params).
- type llamaServerSession struct {
+type llamaServerSession struct {
 	adapter    *llamaServerAdapter
 	modelID    string // selected model if provided
 	baseParams InferParams
@@ -65,7 +70,7 @@ func (a *llamaServerAdapter) Start(modelPath string, params InferParams) (InferS
 }
 
 // openAICompletionRequest represents the payload for /v1/completions.
- type openAICompletionRequest struct {
+type openAICompletionRequest struct {
 	Model       string   `json:"model,omitempty"`
 	Prompt      string   `json:"prompt"`
 	MaxTokens   int      `json:"max_tokens,omitempty"`
@@ -81,14 +86,14 @@ func (a *llamaServerAdapter) Start(modelPath string, params InferParams) (InferS
 }
 
 // openAIStreamChoiceDelta is a minimal subset of OpenAI streaming response.
- type openAIStreamChoiceDelta struct {
+type openAIStreamChoiceDelta struct {
 	Delta struct {
 		Content string `json:"content"`
 	} `json:"delta"`
 	FinishReason string `json:"finish_reason"`
 }
 
- type openAIStreamResponse struct {
+type openAIStreamResponse struct {
 	Object  string                    `json:"object"`
 	Choices []openAIStreamChoiceDelta `json:"choices"`
 }
@@ -125,7 +130,7 @@ func (s *llamaServerSession) generateOpenAI(ctx context.Context, prompt string, 
 		RepeatPenalty: s.baseParams.RepeatPenalty,
 	}
 	body, _ := json.Marshal(payload)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.adapter.baseURL+"/v1/completions", strings.NewReader(string(body)))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.adapter.baseURL+"/v1/completions", bytes.NewReader(body))
 	if err != nil {
 		return FinalResult{}, err
 	}
@@ -183,6 +188,7 @@ func (s *llamaServerSession) generateOpenAI(ctx context.Context, prompt string, 
 						continue
 					}
 				}
+				log.Printf("adapter=llama_server event=unknown_stream_line line=%q", line)
 			}
 		}
 		if err != nil {
@@ -193,6 +199,7 @@ func (s *llamaServerSession) generateOpenAI(ctx context.Context, prompt string, 
 			if ctx.Err() != nil {
 				return final, ctx.Err()
 			}
+			log.Printf("adapter=llama_server event=stream_read_error err=%v", err)
 			return final, err
 		}
 	}

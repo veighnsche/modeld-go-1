@@ -20,9 +20,14 @@ func (m *Manager) Status() types.StatusResponse {
 		UsedMB:   m.usedEstMB,
 		MarginMB: m.marginMB,
 		Error:    m.err,
+		State:    string(m.state),
 	}
 	resp.Instances = make([]types.InstanceStatus, 0, len(m.instances))
+	warmups := 0
+	draining := 0
 	for _, inst := range m.instances {
+		if inst.State == StateLoading { warmups++ }
+		if inst.State == StateDraining { draining++ }
 		resp.Instances = append(resp.Instances, types.InstanceStatus{
 			ModelID:       inst.ID,
 			State:         string(inst.State),
@@ -35,5 +40,7 @@ func (m *Manager) Status() types.StatusResponse {
 			PID:           inst.PID,
 		})
 	}
+	resp.WarmupsInProgress = warmups
+	resp.DrainingCount = draining
 	return resp
 }

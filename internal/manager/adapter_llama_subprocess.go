@@ -1,18 +1,22 @@
 package manager
 
 import (
+    "bytes"
     "bufio"
     "context"
     "encoding/json"
     "errors"
     "fmt"
     "io"
+    "log"
     "net"
     "net/http"
     "os/exec"
+    "strconv"
     "strings"
     "sync"
     "time"
+    "syscall"
 )
 
 // llamaSubprocessAdapter spawns and manages a llama.cpp server per model path.
@@ -22,6 +26,7 @@ type llamaSubprocessAdapter struct {
     mu         sync.Mutex
     procs      map[string]*procInfo // key: modelPath
     httpClient *http.Client
+    publisher  EventPublisher
 }
 
 // isHealthy checks if the llama-server at baseURL responds OK to /v1/models.
@@ -61,8 +66,10 @@ func (a *llamaSubprocessAdapter) StopAll() {
 func NewLlamaSubprocessAdapter(cfg ManagerConfig) InferenceAdapter {
     host := strings.TrimSpace(cfg.LlamaHost)
     if host == "" { host = "127.0.0.1" }
+    // Intentionally set Timeout=0: all calls must use context-based timeouts.
+    // ensureProcess() and Generate() create requests with contexts carrying deadlines.
     cli := &http.Client{ Timeout: 0 }
-    return &llamaSubprocessAdapter{cfg: cfg, procs: make(map[string]*procInfo), httpClient: cli}
+    return &llamaSubprocessAdapter{cfg: cfg, procs: make(map[string]*procInfo), httpClient: cli, publisher: noopPublisher{}}
 }
 
 type procInfo struct {
@@ -106,7 +113,7 @@ func (s *llamaSubprocessSession) Generate(ctx context.Context, prompt string, on
         RepeatPenalty: s.params.RepeatPenalty,
     }
     body, _ := json.Marshal(payload)
-    req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.baseURL+"/v1/completions", strings.NewReader(string(body)))
+    req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.baseURL+"/v1/completions", bytes.NewReader(body))
     if err != nil { return FinalResult{}, err }
     req.Header.Set("Content-Type", "application/json")
     resp, err := s.a.httpClient.Do(req)
@@ -116,7 +123,7 @@ func (s *llamaSubprocessSession) Generate(ctx context.Context, prompt string, on
     }
     defer resp.Body.Close()
     if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-        b, _ := ioReadAllLimit(resp.Body, 4096)
+        b, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
         return FinalResult{}, fmt.Errorf("llama server http error: %s: %s", resp.Status, string(b))
     }
     r := bufio.NewReader(resp.Body)
@@ -139,7 +146,7 @@ func (s *llamaSubprocessSession) Generate(ctx context.Context, prompt string, on
             }
         }
         if err != nil {
-            if errors.Is(err, ioEOF) { break }
+            if errors.Is(err, io.EOF) { break }
             if ctx.Err() != nil { return final, ctx.Err() }
             return final, err
         }
@@ -207,21 +214,64 @@ func (a *llamaSubprocessAdapter) ensureProcess(modelPath string) (string, error)
     cmd := exec.Command(a.cfg.LlamaBin, args...)
     // Inherit stdout/stderr to aid debugging. Could swap for logger later.
     // cmd.Stdout = os.Stdout; cmd.Stderr = os.Stderr
+    // Capture stderr for diagnostics (kept in-memory; tail is included on failure)
+    var stderr bytes.Buffer
+    cmd.Stderr = &stderr
     if err := cmd.Start(); err != nil {
         return "", fmt.Errorf("start llama-server: %w", err)
     }
+    log.Printf("adapter=llama_subprocess event=start model=%q pid=%d host=%s port=%d", modelPath, cmd.Process.Pid, host, port)
+    a.publisher.Publish(Event{Name: "spawn_start", ModelID: modelPath, Fields: map[string]any{"pid": cmd.Process.Pid, "host": host, "port": port}})
 
     // Save proc before readiness wait
     a.mu.Lock()
     a.procs[modelPath] = &procInfo{cmd: cmd, baseURL: baseURL, ready: false, pid: cmd.Process.Pid}
     a.mu.Unlock()
 
-    // Wait readiness
+    // Early-exit watcher: surface non-zero exit before readiness
+    waitErrCh := make(chan error, 1)
+    go func() {
+        waitErrCh <- cmd.Wait()
+    }()
+
+    // Wait readiness with deadline and early failure detection
     deadline := time.Now().Add(30 * time.Second)
     for {
         if time.Now().After(deadline) {
+            // Cleanup proc entry on timeout
+            a.mu.Lock()
+            delete(a.procs, modelPath)
+            a.mu.Unlock()
+            log.Printf("adapter=llama_subprocess event=timeout model=%q pid=%d", modelPath, cmd.Process.Pid)
+            a.publisher.Publish(Event{Name: "spawn_timeout", ModelID: modelPath, Fields: map[string]any{"pid": cmd.Process.Pid}})
             return "", fmt.Errorf("llama-server not ready in time: %s", baseURL)
         }
+        // Check if process exited
+        select {
+        case werr := <-waitErrCh:
+            if werr != nil {
+                // Include a small tail of stderr for context
+                tail := stderr.String()
+                if len(tail) > 4096 { tail = tail[len(tail)-4096:] }
+                // Cleanup proc entry on failure
+                a.mu.Lock()
+                delete(a.procs, modelPath)
+                a.mu.Unlock()
+                log.Printf("adapter=llama_subprocess event=exit_early model=%q pid=%d err=%v", modelPath, cmd.Process.Pid, werr)
+                a.publisher.Publish(Event{Name: "spawn_exit", ModelID: modelPath, Fields: map[string]any{"pid": cmd.Process.Pid, "error": werr.Error()}})
+                return "", fmt.Errorf("llama-server exited early: %v; stderr tail: %s", werr, tail)
+            }
+            // Unexpected nil error here means process exited cleanly before ready
+            a.mu.Lock()
+            delete(a.procs, modelPath)
+            a.mu.Unlock()
+            log.Printf("adapter=llama_subprocess event=exit_clean model=%q pid=%d before_ready=1", modelPath, cmd.Process.Pid)
+            a.publisher.Publish(Event{Name: "spawn_exit", ModelID: modelPath, Fields: map[string]any{"pid": cmd.Process.Pid, "before_ready": true}})
+            return "", fmt.Errorf("llama-server exited before ready: %s", baseURL)
+        default:
+            // proceed to health check
+        }
+
         ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
         req, _ := http.NewRequestWithContext(ctx, http.MethodGet, baseURL+"/v1/models", nil)
         resp, err := a.httpClient.Do(req)
@@ -229,6 +279,8 @@ func (a *llamaSubprocessAdapter) ensureProcess(modelPath string) (string, error)
             _ = resp.Body.Close()
             if resp.StatusCode >= 200 && resp.StatusCode < 300 {
                 cancel()
+                log.Printf("adapter=llama_subprocess event=ready model=%q pid=%d url=%s", modelPath, cmd.Process.Pid, baseURL)
+                a.publisher.Publish(Event{Name: "spawn_ready", ModelID: modelPath, Fields: map[string]any{"pid": cmd.Process.Pid, "url": baseURL}})
                 break
             }
         }
@@ -249,37 +301,22 @@ func pickFreePort(host string) (int, error) {
     // addr like 127.0.0.1:54321
     lastColon := strings.LastIndex(addr, ":")
     if lastColon < 0 { return 0, fmt.Errorf("unexpected addr: %s", addr) }
-    p, err := strconvAtoi(addr[lastColon+1:])
+    p, err := strconv.Atoi(addr[lastColon+1:])
     if err != nil { return 0, err }
     return p, nil
 }
 
-// Minimal helpers to avoid pulling in extra deps
-var ioEOF = io.EOF
-
-func ioReadAllLimit(r io.Reader, n int64) ([]byte, error) {
-    if n <= 0 { n = 4096 }
-    var b strings.Builder
-    br := bufio.NewReader(r)
-    for b.Len() < int(n) {
-        chunk, err := br.ReadString('\n')
-        b.WriteString(chunk)
-        if err != nil { if errors.Is(err, ioEOF) { break }; return []byte(b.String()), err }
-        if b.Len() >= int(n) { break }
+// Accessor to safely read proc info under lock and return a snapshot
+func (a *llamaSubprocessAdapter) getProcInfo(modelPath string) (pid int, baseURL string, ready bool, ok bool) {
+    a.mu.Lock()
+    defer a.mu.Unlock()
+    if a.procs == nil {
+        return 0, "", false, false
     }
-    s := b.String()
-    if len(s) > int(n) { s = s[:n] }
-    return []byte(s), nil
-}
-
-func strconvAtoi(s string) (int, error) {
-    var n int
-    for i := 0; i < len(s); i++ {
-        c := s[i]
-        if c < '0' || c > '9' { return 0, fmt.Errorf("invalid int: %q", s) }
-        n = n*10 + int(c-'0')
+    if p := a.procs[modelPath]; p != nil {
+        return p.pid, p.baseURL, p.ready, true
     }
-    return n, nil
+    return 0, "", false, false
 }
 
 // Stop terminates a spawned llama-server process for the given modelPath, if present.
@@ -291,11 +328,30 @@ func (a *llamaSubprocessAdapter) Stop(modelPath string) error {
         return nil
     }
     // Try to gracefully terminate first, then fall back to kill.
-    // Best-effort: not all platforms support the same signals via os.Process.
-    _ = p.cmd.Process.Kill()
-    _, _ = p.cmd.Process.Wait()
+    // Best-effort: platform-specific; on Unix send SIGTERM.
+    _ = p.cmd.Process.Signal(syscall.SIGTERM)
+    done := make(chan struct{})
+    go func() {
+        _, _ = p.cmd.Process.Wait()
+        close(done)
+    }()
+    select {
+    case <-done:
+        // exited gracefully
+    case <-time.After(2 * time.Second):
+        // force kill
+        _ = p.cmd.Process.Kill()
+        _, _ = p.cmd.Process.Wait()
+    }
     a.mu.Lock()
     delete(a.procs, modelPath)
     a.mu.Unlock()
+    a.publisher.Publish(Event{Name: "spawn_stop", ModelID: modelPath, Fields: map[string]any{}})
     return nil
+}
+
+// setPublisher installs an EventPublisher for emitting adapter events.
+func (a *llamaSubprocessAdapter) setPublisher(p EventPublisher) {
+    if p == nil { a.publisher = noopPublisher{}; return }
+    a.publisher = p
 }

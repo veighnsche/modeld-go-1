@@ -39,6 +39,18 @@ Notes:
 - Client disconnects during `POST /infer` will cancel the in-flight generation.
 - Graceful shutdown cancels in-flight and queued requests.
 
+## Configuration: Manager modes and fields
+
+The manager supports two inference modes selected via `ManagerConfig` (and corresponding CLI/env in `cmd/modeld`):
+
+- Server mode (external llama.cpp server): set `LlamaServerURL` to the base URL of a running server. The adapter will use OpenAI-compatible endpoints and all HTTP requests use context-based timeouts.
+- Spawn mode (managed local llama.cpp): set `SpawnLlama=true` and provide `LlamaBin` (path to `llama-server`). A subprocess is spawned per model with:
+  - `LlamaHost` (default `127.0.0.1`)
+  - `LlamaPortStart`, `LlamaPortEnd` (optional port range; 0 means auto)
+  - `LlamaThreads`, `LlamaCtxSize`, `LlamaNGL`, and `LlamaExtraArgs` for common flags
+
+Precedence: Spawn mode takes precedence when enabled (`SpawnLlama=true` and `LlamaBin` set). Otherwise, if `LlamaServerURL` is set, server mode is used. If neither is configured, inference endpoints will return a dependency-unavailable error (503).
+
 ## Swagger (OpenAPI) Docs
 
 This project includes Swagger annotations and can serve a Swagger UI when built with the `swagger` build tag.

@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
+	"runtime/debug"
 	"strings"
 
 	"modeld/pkg/types"
@@ -15,10 +17,17 @@ import (
 // performs inference via the configured adapter when enabled, and streams
 // NDJSON token lines to the provided writer. If inference is not enabled,
 // it fails fast with a dependency-unavailable error (no mocking).
-func (m *Manager) Infer(ctx context.Context, req types.InferRequest, w io.Writer, flusher func()) error {
-	// Convert unexpected panics into a no-op to avoid tearing down the server;
-	// HTTP layer has its own recoverer for logging.
-	defer func() { _ = recover() }()
+func (m *Manager) Infer(ctx context.Context, req types.InferRequest, w io.Writer, flusher func()) (errRet error) {
+	// Convert unexpected panics into an observable log and error so the HTTP
+	// layer can surface a 500.
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("manager.Infer panic: %v\n%s", r, debug.Stack())
+			if errRet == nil {
+				errRet = fmt.Errorf("internal error: %v", r)
+			}
+		}
+	}()
 	if w == nil {
 		return fmt.Errorf("writer is nil")
 	}
@@ -65,11 +74,11 @@ func (m *Manager) Infer(ctx context.Context, req types.InferRequest, w io.Writer
 	params := InferParams{
 		Temperature:   float32(req.Temperature),
 		TopP:          float32(req.TopP),
-		TopK:          0, // optional, extend types.InferRequest if needed
+		TopK:          req.TopK,
 		MaxTokens:     req.MaxTokens,
 		Stop:          req.Stop,
 		Seed:          int(req.Seed),
-		RepeatPenalty: 0,
+		RepeatPenalty: float32(req.RepeatPenalty),
 	}
 	if err := ctx.Err(); err != nil {
 		return err

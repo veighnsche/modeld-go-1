@@ -10,6 +10,7 @@ import (
 const (
 	defaultMaxQueueDepth = 32
 	defaultMaxWait       = 30 * time.Second
+	defaultDrainTimeout  = 2 * time.Second
 )
 
 // ManagerConfig encapsulates all tunables for Manager construction.
@@ -20,6 +21,7 @@ type ManagerConfig struct {
 	DefaultModel  string
 	MaxQueueDepth int
 	MaxWait       time.Duration
+	DrainTimeout  time.Duration
 	// HTTP llama server configuration
 	LlamaServerURL      string
 	LlamaAPIKey         string
@@ -59,6 +61,11 @@ func NewWithConfig(cfg ManagerConfig) *Manager {
 	} else {
 		m.maxWait = cfg.MaxWait
 	}
+	if cfg.DrainTimeout <= 0 {
+		m.drainTimeout = defaultDrainTimeout
+	} else {
+		m.drainTimeout = cfg.DrainTimeout
+	}
 	// Adapter selection
 	if cfg.SpawnLlama && cfg.LlamaBin != "" {
 		m.adapter = NewLlamaSubprocessAdapter(cfg)
@@ -72,5 +79,12 @@ func NewWithConfig(cfg ManagerConfig) *Manager {
 		)
 	}
 	m.startTime = time.Now()
+	// Initialize event publisher and wire into adapter if needed
+	if m.publisher == nil {
+		m.publisher = noopPublisher{}
+	}
+	if sa, ok := m.adapter.(*llamaSubprocessAdapter); ok {
+		sa.setPublisher(m.publisher)
+	}
 	return m
 }

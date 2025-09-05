@@ -32,26 +32,25 @@
 - `internal/httpapi/`: stable HTTP surface including `/models`, `/status`, `/infer`, health and metrics.
 - `cmd/modeld/`: CLI + config loader set for external-server adapter.
 
-Conclusion: the Manager lifecycle, queueing, and HTTP plumbing are already compatible with a subprocess adapter. We need to add one and wire it.
+Conclusion: the Manager lifecycle, queueing, and HTTP plumbing are compatible with a subprocess adapter. This has now been implemented: the manager can spawn a `llama-server` per model and manage its lifecycle.
 
 ---
 
-## Proposed Design
+## Design Summary
 
-### New Adapter: `adapter_llama_subprocess`
+### Adapter: `adapter_llama_subprocess`
 
-- A new implementation of `InferenceAdapter` that:
-  - On `Start(modelPath, params)`, ensures a long-lived `llama-server` process exists for the target model. If missing, spawn one.
+- Implementation of `InferenceAdapter` that:
+  - On `Start(modelPath, params)`, ensures a long-lived `llama-server` process exists for the target model. If missing, spawns one.
   - Picks a free TCP port per process and starts `llama-server` with flags derived from config (e.g., `-m <path> -c <ctx> -ngl <N> -t <threads> --host 127.0.0.1 --port <X>`).
-  - Waits for readiness by polling `/v1/models` or equivalent.
-  - Returns a session whose `Generate` forwards to the local `llama-server` using the existing streaming logic (we can internally reuse the OpenAI streaming code already in `adapter_llama_server.go`).
+  - Waits for readiness by polling `/v1/models` (with deadlines and early-exit on child failure).
+  - Returns a session whose `Generate` forwards to the local `llama-server` using OpenAI-compatible streaming logic.
   - `Close()` on the session does not kill the process; instance eviction kills the process.
 
 ### Manager Integration
 
-- Instance state (`Instance`) gains (or reuses) fields to hold:
-  - Process handle/metadata (PID, command line, creation time).
-  - Assigned port and computed base URL.
+- Instance state (`Instance`) holds:
+  - PID of the managed subprocess and its assigned port (exposed via `/status`).
   - Ready/Loading/Error state transitions reusing existing readiness checks.
 - `EnsureInstance(ctx, modelID)`:
   - If not present, admits into creation gate, spawns subprocess for the model’s `.gguf`, waits for readiness (or returns error).
@@ -65,26 +64,18 @@ Conclusion: the Manager lifecycle, queueing, and HTTP plumbing are already compa
 - Queues protect each instance from overload and ensure fair FIFO admission when multiple requests target the same model. They also enable controlled backpressure via `MaxQueueDepth` and `MaxWait`.
 - With subprocess management, each instance is still single-producer (one request at a time) unless `llama-server` supports sufficient concurrency. The queue is the safety valve.
 
-### CLI and Config Changes
+### Config Changes
 
-Extend `ManagerConfig` and CLI to select spawn mode and pass spawn options:
+`ManagerConfig` selects adapter mode and passes spawn options:
 
-- ManagerConfig additions:
-  - `SpawnLlama bool`
-  - `LlamaBin string` (path to `llama-server`)
-  - `LlamaHost string` (default `127.0.0.1`)
-  - `LlamaPortStart, LlamaPortEnd int` (optional port range; 0=auto)
-  - `LlamaThreads int`, `LlamaCtxSize int`, `LlamaNGL int` (common llama args)
-  - `LlamaExtraArgs []string` (escape hatch)
-- CLI (`cmd/modeld/main.go`) additions:
-  - `--spawn-llama`
-  - `--llama-bin`, `--llama-host`, `--llama-port-range=30000-30100`
-  - `--llama-threads`, `--llama-ctx`, `--llama-ngl`
-  - `--llama-extra-args="-ms 8 -tt 1"` (raw passthrough)
-- Adapter selection logic in `NewWithConfig`:
-  - If `SpawnLlama` is true and `LlamaBin` is set, use subprocess adapter.
-  - Else if `LlamaServerURL` is set, use external-server adapter.
-  - Else: return `ErrDependencyUnavailable` on infer (current behavior) or log preflight failure.
+- `LlamaServerURL string` to use an external llama.cpp server (OpenAI-compatible).
+- `SpawnLlama bool` and `LlamaBin string` to enable spawn mode.
+- `LlamaHost string` (default `127.0.0.1`).
+- `LlamaPortStart, LlamaPortEnd int` (optional port range; 0=auto).
+- `LlamaThreads int`, `LlamaCtxSize int`, `LlamaNGL int`.
+- `LlamaExtraArgs []string`.
+
+Adapter selection (`NewWithConfig`): spawn mode takes precedence when enabled; otherwise server mode is used if `LlamaServerURL` is set.
 
 ### Instance Lifecycle
 
@@ -118,9 +109,7 @@ Extend `ManagerConfig` and CLI to select spawn mode and pass spawn options:
   - Port allocation.
   - Command construction from config.
   - Readiness polling with timeouts.
-- Integration tests (skipping when `llama-server` or `.gguf` unavailable):
-  - Spawn mode: start our server, request a haiku, assert non-empty content and print it.
-  - Eviction: ensure process stops and port is released.
+- Integration tests (skipping when `llama-server` or `.gguf` unavailable) are planned.
 - Existing e2e (CORS, 429, status, metrics) remain in place.
 
 ---

@@ -6,11 +6,13 @@ import (
 	"net/url"
 	"strconv"
 	"time"
+	"log"
 )
 
 // EnsureInstance ensures a model instance is initialized and marked ready
 // according to current resource budgeting and readiness state.
 func (m *Manager) EnsureInstance(ctx context.Context, modelID string) error {
+	startTs := time.Now()
 	if modelID == "" {
 		// If unspecified, use default if present; else no-op for now
 		modelID = m.defaultModel
@@ -18,6 +20,8 @@ func (m *Manager) EnsureInstance(ctx context.Context, modelID string) error {
 			return nil
 		}
 	}
+	log.Printf("manager event=ensure_start model=%q", modelID)
+	m.publisher.Publish(Event{Name: "ensure_start", ModelID: modelID, Fields: map[string]any{}})
 
 	m.mu.RLock()
 	inst, ok := m.instances[modelID]
@@ -38,6 +42,8 @@ func (m *Manager) EnsureInstance(ctx context.Context, modelID string) error {
 	// Resolve model from registry
 	mdl, ok := m.getModelByID(modelID)
 	if !ok {
+		log.Printf("manager event=ensure_model_not_found model=%q", modelID)
+		m.publisher.Publish(Event{Name: "ensure_model_not_found", ModelID: modelID, Fields: map[string]any{}})
 		return ErrModelNotFound(modelID)
 	}
 	reqMB := m.estimateVRAMMB(mdl)
@@ -45,6 +51,8 @@ func (m *Manager) EnsureInstance(ctx context.Context, modelID string) error {
 	// Evict until it fits budget + margin, if budget configured
 	if m.budgetMB > 0 {
 		if err := m.evictUntilFits(reqMB); err != nil {
+			log.Printf("manager event=ensure_budget_fail model=%q err=%v", modelID, err)
+			m.publisher.Publish(Event{Name: "ensure_budget_fail", ModelID: modelID, Fields: map[string]any{"error": err.Error()}})
 			return err
 		}
 	}
@@ -84,21 +92,25 @@ func (m *Manager) EnsureInstance(ctx context.Context, modelID string) error {
 			m.state = StateError
 			m.err = err.Error()
 			m.mu.Unlock()
+			log.Printf("manager event=ensure_spawn_error model=%q err=%v", modelID, err)
+			m.publisher.Publish(Event{Name: "ensure_spawn_error", ModelID: modelID, Fields: map[string]any{"error": err.Error()}})
 			return err
 		}
 		// Record port and PID on instance for status visibility
-		if p := sa.procs[mdl.Path]; p != nil {
-			if u, err := url.Parse(p.baseURL); err == nil {
+		if pid, base, _, ok2 := sa.getProcInfo(mdl.Path); ok2 {
+			if u, err := url.Parse(base); err == nil {
 				if _, portStr, err2 := net.SplitHostPort(u.Host); err2 == nil {
 					if portNum, e := strconv.Atoi(portStr); e == nil {
 						m.mu.Lock()
 						inst.Port = portNum
-						inst.PID = p.pid
+						inst.PID = pid
 						m.mu.Unlock()
 					}
 				}
 			}
 		}
+		log.Printf("manager event=ensure_spawn_ready model=%q pid=%d port=%d", modelID, inst.PID, inst.Port)
+		m.publisher.Publish(Event{Name: "ensure_spawn_ready", ModelID: modelID, Fields: map[string]any{"pid": inst.PID, "port": inst.Port}})
 	}
 
 	// Warmup sleep to preserve readiness transitions.
@@ -124,6 +136,8 @@ func (m *Manager) EnsureInstance(ctx context.Context, modelID string) error {
 	m.state = StateReady
 	m.err = ""
 	m.mu.Unlock()
+	log.Printf("manager event=ensure_ready model=%q dur_ms=%d", modelID, time.Since(startTs)/time.Millisecond)
+	m.publisher.Publish(Event{Name: "ensure_ready", ModelID: modelID, Fields: map[string]any{"dur_ms": int(time.Since(startTs)/time.Millisecond)}})
 	return nil
 }
 

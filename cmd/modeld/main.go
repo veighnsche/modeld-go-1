@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"encoding/json"
 	"log"
 	"net/http"
 	"os"
@@ -21,12 +22,30 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// logStdoutPublisher writes events as JSON to stdout.
+type logStdoutPublisher struct{}
+
+func (logStdoutPublisher) Publish(e manager.Event) {
+    b, _ := json.Marshal(e)
+    os.Stdout.Write(append(b, '\n'))
+}
+
+// logFilePublisher writes events as JSON to the configured file.
+type logFilePublisher struct{ f *os.File }
+
+func (p logFilePublisher) Publish(e manager.Event) {
+    if p.f == nil { return }
+    b, _ := json.Marshal(e)
+    _, _ = p.f.Write(append(b, '\n'))
+}
+
 func main() {
 	// Flags with environment variable defaults
 	defaultAddr := ":8080"
 	if v := os.Getenv("MODELD_ADDR"); v != "" {
 		defaultAddr = v
 	}
+
 	addr := flag.String("addr", defaultAddr, "HTTP listen address, e.g. :8080")
 	configPath := flag.String("config", "", "Optional path to config file (yaml|yml|json|toml)")
 	modelsDir := flag.String("models-dir", "~/models/llm", "Directory to scan for *.gguf model files")
@@ -60,6 +79,11 @@ func main() {
 	llamaCtx := flag.Int("llama-ctx", 0, "Context size for spawned llama-server (-c)")
 	llamaNGL := flag.Int("llama-ngl", 0, "NGL (GPU layers) for spawned llama-server (-ngl)")
 	llamaPortRange := flag.String("llama-port-range", "", "Port range for spawned llama-server processes, e.g., 30000-30100")
+	// Events
+	eventsEnable := flag.Bool("events-enable", false, "Enable manager event publishing to stdout or a file")
+	eventsFile := flag.String("events-file", "", "If set, write events as lines of JSON to this file; otherwise stdout")
+	// Drain timeout for graceful unload
+	drainTimeout := flag.Duration("drain-timeout", 0, "Graceful drain timeout for Unload() (e.g., 2s; 0=default)")
 
 	flag.Parse()
 
@@ -188,6 +212,7 @@ func main() {
 		DefaultModel:  *defaultModel,
 		MaxQueueDepth: *maxQueueDepth,
 		MaxWait:       *maxWait,
+		DrainTimeout:  *drainTimeout,
 		// Server adapter config
 		LlamaServerURL:      *llamaURL,
 		LlamaAPIKey:         *llamaAPIKey,
@@ -204,6 +229,20 @@ func main() {
 		LlamaCtxSize:   *llamaCtx,
 		LlamaNGL:       *llamaNGL,
 	})
+
+	if *eventsEnable {
+        if *eventsFile != "" {
+            f, err := os.OpenFile(*eventsFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+            if err != nil {
+                log.Fatalf("open events file: %v", err)
+            }
+            pub := logFilePublisher{f: f}
+            mgr.SetEventPublisher(pub)
+        } else {
+            pub := logStdoutPublisher{}
+            mgr.SetEventPublisher(pub)
+        }
+    }
 
 	// Preflight: validate adapter presence and default model path.
 	checks := mgr.Preflight()

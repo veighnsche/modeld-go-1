@@ -4,7 +4,10 @@ import "context"
 
 // Switch kicks off an async model switch/ensure and returns an operation ID.
 // The operation runs in the background; callers can poll Status() to observe
-// state transitions. This is a minimal implementation sufficient for tests.
+// state transitions. Background work is intentionally detached from the caller's
+// context so that transient client cancellations do not abort the switch. For
+// shutdown, use Manager.Close()/StopAllInstances() which will stop managed
+// subprocesses and allow future extensions to cancel background ops.
 func (m *Manager) Switch(ctx context.Context, modelID string) (string, error) {
 	op := m.nextOpID()
 	go func(opID string) {

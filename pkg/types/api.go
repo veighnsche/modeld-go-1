@@ -20,12 +20,18 @@ type InferRequest struct {
 	// Nucleus sampling probability.
 	// example: 0.9
 	TopP float64 `json:"top_p,omitempty" example:"0.9"`
+	// Top-K sampling: limit candidates to top K tokens.
+	// example: 40
+	TopK int `json:"top_k,omitempty" example:"40"`
 	// Optional stop sequences. Generation stops when any sequence is matched.
 	// example: ["\n\n","END"]
 	Stop []string `json:"stop,omitempty" example:"[\"\\n\\n\",\"END\"]"`
 	// Random seed for reproducibility; 0 or omitted lets the server choose.
 	// example: 42
 	Seed int64 `json:"seed,omitempty" example:"42"`
+	// Repeat penalty applied by some llama servers.
+	// example: 1.1
+	RepeatPenalty float64 `json:"repeat_penalty,omitempty" example:"1.1"`
 }
 
 // ModelsResponse wraps the list of models returned by GET /models.
@@ -104,4 +110,13 @@ type StatusResponse struct {
 	// Total number of model loads.
 	// example: 12
 	LoadsTotal uint64 `json:"loads_total" example:"12"`
+    // Overall manager state (e.g., loading, ready, error).
+    // example: ready
+    State string `json:"state" example:"ready"`
+    // Number of instances currently warming up (loading).
+    // example: 1
+    WarmupsInProgress int `json:"warmups_in_progress" example:"1"`
+    // Number of instances currently draining (unload in progress).
+    // example: 1
+    DrainingCount int `json:"draining_count" example:"1"`
 }

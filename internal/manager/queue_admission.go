@@ -14,19 +14,25 @@ func (m *Manager) beginGeneration(ctx context.Context, modelID string) (func(), 
 	if inst == nil {
 		return func() {}, modelNotFoundError{id: modelID}
 	}
+	// If draining, reject new work to allow graceful shutdown/unload
+	if inst.State == StateDraining {
+		return func() {}, tooBusyError{modelID: modelID}
+	}
 
 	// Fast path: respect an already-canceled context
 	if err := ctx.Err(); err != nil {
 		return func() {}, err
 	}
 
-	// Try to reserve a queue slot with timeout
+	// Try to reserve a queue slot with timeout (pooled timer to reduce allocations)
+	timer := time.NewTimer(m.maxWait)
+	defer timer.Stop()
 	select {
 	case inst.queueCh <- struct{}{}:
 		// reserved queue slot
 	case <-ctx.Done():
 		return func() {}, ctx.Err()
-	case <-time.After(m.maxWait):
+	case <-timer.C:
 		return func() {}, tooBusyError{modelID: modelID}
 	}
 
@@ -41,6 +47,8 @@ func (m *Manager) beginGeneration(ctx context.Context, modelID string) (func(), 
 	if err := ctx.Err(); err != nil {
 		return func() {}, err
 	}
+	timer2 := time.NewTimer(m.maxWait)
+	defer timer2.Stop()
 	select {
 	case inst.genCh <- struct{}{}:
 		acquired = true
@@ -51,7 +59,7 @@ func (m *Manager) beginGeneration(ctx context.Context, modelID string) (func(), 
 		return func() { <-inst.genCh; <-inst.queueCh }, nil
 	case <-ctx.Done():
 		return func() {}, ctx.Err()
-	case <-time.After(m.maxWait):
+	case <-timer2.C:
 		return func() {}, tooBusyError{modelID: modelID}
 	}
 }
