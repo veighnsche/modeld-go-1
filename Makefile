@@ -10,7 +10,8 @@ WEB_PORT ?= 5173
         swagger-install swagger-gen swagger-build swagger-run \
         web-build web-preview web-dev \
         e2e-cy-auto \
-        test-all cli test-cli testctl-build
+        test-all cli test-cli testctl-build \
+        ci-go ci-e2e-python ci-e2e-cypress ci-all
 
 build:
 	@mkdir -p bin
@@ -122,3 +123,19 @@ cli:
 # Run CLI tests
 test-cli:
 	@bash scripts/tests/cli.test.sh
+
+# CI local runners (via nektos/act)
+# Requires: https://github.com/nektos/act (see .actrc for defaults)
+ci-all: ci-go ci-e2e-python ci-e2e-cypress ## Run all CI workflows locally (act)
+
+ci-go:
+	@command -v act >/dev/null 2>&1 || { echo "act not found. Install: https://github.com/nektos/act" >&2; exit 1; }
+	@act -W .github/workflows/ci-go.yml
+
+ci-e2e-python:
+	@command -v act >/dev/null 2>&1 || { echo "act not found. Install: https://github.com/nektos/act" >&2; exit 1; }
+	@act -W .github/workflows/ci-e2e-python.yml
+
+ci-e2e-cypress:
+	@command -v act >/dev/null 2>&1 || { echo "act not found. Install: https://github.com/nektos/act" >&2; exit 1; }
+	@act -W .github/workflows/ci-e2e-cypress.yml

@@ -17,12 +17,13 @@ func (m *Manager) EnsureInstance(ctx context.Context, modelID string) error {
 	}
 
 	m.mu.RLock()
-	instReady, ok := m.instances[modelID]
+	inst, ok := m.instances[modelID]
+	ready := ok && inst != nil && inst.State == StateReady
 	m.mu.RUnlock()
-	if ok && instReady.State == StateReady {
-		// Upgrade to write lock to safely mutate LastUsed
+	if ready {
+		// Upgrade to write lock to safely mutate LastUsed and re-check state
 		m.mu.Lock()
-		if inst2, ok2 := m.instances[modelID]; ok2 && inst2.State == StateReady {
+		if inst2, ok2 := m.instances[modelID]; ok2 && inst2 != nil && inst2.State == StateReady {
 			inst2.LastUsed = time.Now()
 			m.mu.Unlock()
 			return nil
