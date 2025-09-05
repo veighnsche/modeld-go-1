@@ -1,23 +1,50 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+VERSION="0.1.0"
+
 usage() {
   cat <<'USAGE'
 Usage: test-cli <command>
 
-Commands:
-  install:all        Install JS, Go, Python deps
-  install:js         Install JS deps (pnpm root + web)
-  install:go         Download Go modules
-  install:py         Setup Python venv and pip install
+Description:
+  A lightweight Bash CLI to install dependencies and run tests across the repo.
+  Designed to work on fresh Arch installs without Node; only Bash + system tools required.
 
-  test:go            Run Go tests
-  test:py            Run Python black-box tests
-  test:cy:mock       Run Cypress (mock API)
-  test:cy:live       Run Cypress (live API)
+Commands:
+  install:all        Install JS, Go, and Python dependencies
+  install:js         Install JS deps (pnpm at root + web/)
+  install:go         Download Go modules
+  install:py         Create venv under tests/e2e_py/.venv and pip install
+
+  test:go            Run Go tests (go test ./... -v)
+  test:py            Run Python black-box tests (pytest tests/e2e_py)
+  test:cy:mock       Run Cypress against the mock web harness
+  test:cy:live       Run Cypress against a live API started by Makefile
   test:all           Run all test suites sequentially
 
   help               Show this help
+  --version          Print CLI version
+
+Prerequisites:
+  - Go toolchain (go)
+  - Python 3 (python3)
+  - Node + pnpm for JS/Cypress (CLI will try to enable pnpm via corepack if present)
+
+Environment variables (used by downstream scripts):
+  - WEB_PORT            Port for Vite preview (default: 5173)
+  - CYPRESS_BASE_URL    Base URL for Cypress runs
+  - CYPRESS_USE_MOCKS   "1" for mock mode, "0" for live API mode
+  - CYPRESS_API_*       API health/ready/status URLs in live mode
+
+Examples:
+  bash scripts/test-cli.sh install:all
+  bash scripts/test-cli.sh test:go
+  bash scripts/test-cli.sh test:cy:mock
+  bash scripts/test-cli.sh test:all
+
+Exit codes:
+  0 on success; non-zero if any subcommand fails.
 USAGE
 }
 
@@ -51,6 +78,9 @@ case "$cmd" in
     ;;
   test:all)
     bash scripts/test-all.sh "$@"
+    ;;
+  --version)
+    echo "test-cli version $VERSION"
     ;;
   help|--help|-h|*)
     usage
