@@ -36,3 +36,13 @@ cors_allowed_headers:
 # Backpressure controls (optional)
 max_queue_depth: 16               # per-instance queue length cap
 max_wait: "15s"                   # max time a request may wait in queue
+
+# Real inference / llama.cpp (optional)
+# Enable real inference (adapter-backed) rather than placeholder tokens
+# real_infer: true
+# Path to llama.cpp server binary (llama-server)
+# llama_bin: "/home/USER/apps/llama.cpp/build/bin/llama-server"
+# Context window size for llama.cpp
+# llama_ctx: 4096
+# Threads for llama.cpp (0=auto)
+# llama_threads: 0

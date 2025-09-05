@@ -20,6 +20,11 @@ type ManagerConfig struct {
 	DefaultModel  string
 	MaxQueueDepth int
 	MaxWait       time.Duration
+	// Real inference / llama.cpp configuration (no envs; set by callers)
+	RealInferEnabled bool
+	LlamaBin         string
+	LlamaCtx         int
+	LlamaThreads     int
 }
 
 // NewWithConfig constructs a Manager from ManagerConfig.
@@ -43,6 +48,11 @@ func NewWithConfig(cfg ManagerConfig) *Manager {
 	} else {
 		m.maxWait = cfg.MaxWait
 	}
+	// Real inference configuration
+	m.RealInferEnabled = cfg.RealInferEnabled
+	m.LlamaBin = cfg.LlamaBin
+	m.LlamaCtx = cfg.LlamaCtx
+	m.LlamaThreads = cfg.LlamaThreads
 	m.startTime = time.Now()
 	return m
 }

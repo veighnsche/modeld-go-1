@@ -31,6 +31,11 @@ type Config struct {
 	// Backpressure
 	MaxQueueDepth int    `json:"max_queue_depth" yaml:"max_queue_depth" toml:"max_queue_depth"`
 	MaxWait       string `json:"max_wait" yaml:"max_wait" toml:"max_wait"`
+	// Real inference / llama.cpp
+	RealInferEnabled bool   `json:"real_infer" yaml:"real_infer" toml:"real_infer"`
+	LlamaBin         string `json:"llama_bin" yaml:"llama_bin" toml:"llama_bin"`
+	LlamaCtx         int    `json:"llama_ctx" yaml:"llama_ctx" toml:"llama_ctx"`
+	LlamaThreads     int    `json:"llama_threads" yaml:"llama_threads" toml:"llama_threads"`
 }
 
 // Load reads a configuration file based on its extension.

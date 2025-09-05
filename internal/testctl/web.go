@@ -10,6 +10,28 @@ import (
 	"time"
 )
 
+// findLlamaBin attempts to locate a llama.cpp server binary for local dev.
+// Preference order:
+// 1) /home/vince/apps/llama.cpp/build/bin/llama-server
+// 2) Jan-managed path under ~/.local/share/Jan/...
+// 3) PATH lookup via exec.LookPath("llama-server")
+func findLlamaBin() string {
+    candidates := []string{
+        filepath.Clean(filepath.Join(homeDir(), "apps", "llama.cpp", "build", "bin", "llama-server")),
+        filepath.Clean(filepath.Join(homeDir(), ".local", "share", "Jan", "data", "llamacpp", "backends", "b6293", "linux-avx2-cuda-cu12.0-x64", "build", "bin", "llama-server")),
+    }
+    for _, p := range candidates {
+        if fi, err := os.Stat(p); err == nil && !fi.IsDir() {
+            return p
+        }
+    }
+    if lp, err := exec.LookPath("llama-server"); err == nil {
+        return lp
+    }
+    // Fallback to a common name; modeld will error if it truly does not exist
+    return "llama-server"
+}
+
 // UI suites
 func testWebMock(cfg *Config) error {
 	info("==== Run Cypress (Mock) ====")
@@ -89,7 +111,11 @@ func testWebHaikuHost(cfg *Config) error {
 	}
 	srvCtx, srvCancel := context.WithCancel(context.Background())
 	defer srvCancel()
-	srv := exec.CommandContext(srvCtx, "bash", "-lc", fmt.Sprintf("go run ./cmd/modeld --addr :%d --models-dir '%s' --default-model '%s' --cors-enabled --cors-origins '*'", apiPort, modelsDir, defaultModel))
+	llamaBin := findLlamaBin()
+	srv := exec.CommandContext(srvCtx, "bash", "-lc", fmt.Sprintf(
+		"go run ./cmd/modeld --addr :%d --models-dir '%s' --default-model '%s' --cors-enabled --cors-origins '*' --real-infer --llama-bin '%s'",
+		apiPort, modelsDir, defaultModel, llamaBin,
+	))
 	srv.Stdout = os.Stdout
 	srv.Stderr = os.Stderr
 	if err := srv.Start(); err != nil {

@@ -46,4 +46,6 @@ type Instance struct {
 	queueCh chan struct{} // buffered: queue slots
 	// Adapter backing this instance (placeholder for real model runtime)
 	Adapter Adapter
+	// Runtime endpoint info (when real inference is enabled)
+	Port int
 }

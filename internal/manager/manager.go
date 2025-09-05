@@ -1,9 +1,9 @@
 package manager
 
 import (
-	"sync"
-	"sync/atomic"
-	"time"
+    "sync"
+    "sync/atomic"
+    "time"
 
 	"modeld/pkg/types"
 )
@@ -30,6 +30,17 @@ type Manager struct {
 
 	// Observability
 	startTime time.Time
+
+	// Optional inference adapter (e.g., llama.cpp). When set and enabled,
+	// Manager.Infer will delegate token generation to this adapter instead of
+	// the placeholder implementation.
+	adapter InferenceAdapter
+
+	// Real inference / llama.cpp configuration (flag-driven, no envs)
+	RealInferEnabled bool
+	LlamaBin         string
+	LlamaCtx         int
+	LlamaThreads     int
 }
 
 func New(reg []types.Model, budgetMB, marginMB int, defaultModel string) *Manager {
@@ -42,6 +53,13 @@ func New(reg []types.Model, budgetMB, marginMB int, defaultModel string) *Manage
 		MaxQueueDepth: 0, // use package defaults
 		MaxWait:       0, // use package defaults
 	})
+}
+
+// SetInferenceAdapter sets the inference adapter for the manager.
+func (m *Manager) SetInferenceAdapter(adapter InferenceAdapter) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.adapter = adapter
 }
 
 // nextOpID returns a unique operation ID string with the prefix "op-".
